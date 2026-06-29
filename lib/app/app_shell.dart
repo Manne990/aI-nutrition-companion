@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../domain/models/ai_settings.dart';
 import '../domain/models/health.dart';
 import '../domain/models/onboarding.dart';
+import '../domain/repositories/ai_chat_repository.dart';
 import '../domain/repositories/ai_settings_repository.dart';
 import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
@@ -19,11 +20,13 @@ class AppShell extends StatefulWidget {
     required this.onboardingRepository,
     required this.aiSettingsRepository,
     required this.healthRepository,
+    required this.aiChatRepository,
   });
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
   final HealthRepository healthRepository;
+  final AiChatRepository aiChatRepository;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -104,6 +107,8 @@ class _AppShellState extends State<AppShell> {
                 adapter: MockNutritionCompanionAdapter(
                   configuration: aiConfiguration,
                 ),
+                chatRepository: widget.aiChatRepository,
+                aiConfiguration: aiConfiguration,
                 mealRecognitionAdapter: MockMealRecognitionAdapter(
                   configuration: aiConfiguration,
                 ),

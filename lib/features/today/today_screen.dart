@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../domain/models/ai_settings.dart';
 import '../../domain/models/health.dart';
 import '../../domain/models/meal_suggestion.dart';
 import '../../domain/models/nutrition.dart';
 import '../../domain/models/onboarding.dart';
+import '../../domain/repositories/ai_chat_repository.dart';
 import '../../domain/repositories/nutrition_repository.dart';
+import '../../services/adapters/ai_chat_adapter.dart';
 import '../../services/adapters/meal_recognition_adapter.dart';
 import '../../services/adapters/nutrition_companion_adapter.dart';
 import '../../services/photo/photo_meal_source.dart';
@@ -16,6 +19,7 @@ import '../../shared/widgets/app_metric_row.dart';
 import '../../shared/widgets/app_section_card.dart';
 import '../../shared/widgets/food_image_card.dart';
 import '../../shared/widgets/source_chip.dart';
+import '../chat/ai_chat_screen.dart';
 import '../photo_logging/photo_meal_logging_card.dart';
 
 class TodayScreen extends StatefulWidget {
@@ -24,6 +28,16 @@ class TodayScreen extends StatefulWidget {
     required this.profile,
     this.adapter = const MockNutritionCompanionAdapter(),
     this.repository,
+    this.chatRepository,
+    this.aiConfiguration = const AiAdapterConfiguration(
+      settings: AiProviderSettings.defaults,
+      tokenState: AiTokenState(
+        hasToken: false,
+        isSecureStorage: true,
+        storageLabel: 'mock local storage',
+      ),
+    ),
+    this.aiChatAdapter = const MockAiChatAdapter(),
     this.photoMealSource,
     this.mealRecognitionAdapter = const MockMealRecognitionAdapter(),
     this.healthSignals,
@@ -33,6 +47,9 @@ class TodayScreen extends StatefulWidget {
   final OnboardingProfile profile;
   final NutritionCompanionAdapter adapter;
   final NutritionRepository? repository;
+  final AiChatRepository? chatRepository;
+  final AiAdapterConfiguration aiConfiguration;
+  final AiChatAdapter aiChatAdapter;
   final PhotoMealSource? photoMealSource;
   final MealRecognitionAdapter mealRecognitionAdapter;
   final HealthSignalSnapshot? healthSignals;
@@ -45,7 +62,9 @@ class TodayScreen extends StatefulWidget {
 class _TodayScreenState extends State<TodayScreen> {
   late List<MealSuggestion> _suggestions;
   late NutritionRepository _repository;
+  late AiChatRepository _chatRepository;
   final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _chatController = TextEditingController();
   int _selectedSuggestionIndex = 0;
   _SuggestionAction _lastAction = _SuggestionAction.none;
   String? _aiChoiceMessage;
@@ -54,12 +73,14 @@ class _TodayScreenState extends State<TodayScreen> {
   void initState() {
     super.initState();
     _repository = _createRepository();
+    _chatRepository = _createChatRepository();
     _suggestions = _loadSuggestions();
   }
 
   @override
   void dispose() {
     _weightController.dispose();
+    _chatController.dispose();
     super.dispose();
   }
 
@@ -78,6 +99,9 @@ class _TodayScreenState extends State<TodayScreen> {
         oldWidget.profile != widget.profile) {
       _repository = _createRepository();
     }
+    if (oldWidget.chatRepository != widget.chatRepository) {
+      _chatRepository = _createChatRepository();
+    }
   }
 
   NutritionRepository _createRepository() {
@@ -86,6 +110,10 @@ class _TodayScreenState extends State<TodayScreen> {
           seedGoal: widget.profile.toNutritionGoal(calories: 2200),
           seedPreferences: widget.profile.toUserPreferences(),
         );
+  }
+
+  AiChatRepository _createChatRepository() {
+    return widget.chatRepository ?? InMemoryAiChatRepository();
   }
 
   List<MealSuggestion> _loadSuggestions() {
@@ -152,6 +180,13 @@ class _TodayScreenState extends State<TodayScreen> {
             onRefresh: _refreshSuggestion,
             onDefer: _deferSuggestion,
           ),
+        const SizedBox(height: AppSpacing.md),
+        _ChatEntryCard(
+          controller: _chatController,
+          onSubmit: _openChatWithText,
+          onCamera: () => _openChatWithShortcut(_ChatShortcut.camera),
+          onVoice: () => _openChatWithShortcut(_ChatShortcut.voice),
+        ),
         const SizedBox(height: AppSpacing.md),
         AppSectionCard(
           title: 'Daily rhythm',
@@ -273,6 +308,106 @@ class _TodayScreenState extends State<TodayScreen> {
     setState(() {
       _aiChoiceMessage = '${suggestion.mealName} added from Quick Log.';
     });
+  }
+
+  void _openChatWithText() {
+    final prompt = _chatController.text.trim();
+    if (prompt.isEmpty) {
+      _openChat(initialPrompt: null);
+      return;
+    }
+    _chatController.clear();
+    _openChat(initialPrompt: prompt);
+  }
+
+  void _openChatWithShortcut(_ChatShortcut shortcut) {
+    final prompt = switch (shortcut) {
+      _ChatShortcut.camera => 'Use camera context for my next meal.',
+      _ChatShortcut.voice => 'Start a voice-style nutrition question.',
+    };
+    _openChat(initialPrompt: prompt);
+  }
+
+  void _openChat({String? initialPrompt}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AiChatScreen(
+          profile: widget.profile,
+          nutritionRepository: _repository,
+          chatRepository: _chatRepository,
+          configuration: widget.aiConfiguration,
+          currentSuggestion: _activeSuggestion,
+          adapter: widget.aiChatAdapter,
+          initialPrompt: initialPrompt,
+          now: widget.now,
+        ),
+      ),
+    );
+  }
+}
+
+enum _ChatShortcut { camera, voice }
+
+class _ChatEntryCard extends StatelessWidget {
+  const _ChatEntryCard({
+    required this.controller,
+    required this.onSubmit,
+    required this.onCamera,
+    required this.onVoice,
+  });
+
+  final TextEditingController controller;
+  final VoidCallback onSubmit;
+  final VoidCallback onCamera;
+  final VoidCallback onVoice;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      title: 'Ask the companion',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => onSubmit(),
+            decoration: const InputDecoration(
+              hintText: 'Ask what to eat, why, or how to adjust',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(AppRadii.md)),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              AppIconActionButton(
+                icon: Icons.camera_alt_outlined,
+                tooltip: 'Camera',
+                onPressed: onCamera,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              AppIconActionButton(
+                icon: Icons.mic_none,
+                tooltip: 'Voice',
+                onPressed: onVoice,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: AppPrimaryButton(
+                  label: 'Ask',
+                  icon: Icons.send_rounded,
+                  onPressed: onSubmit,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

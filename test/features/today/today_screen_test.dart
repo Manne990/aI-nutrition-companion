@@ -3,6 +3,7 @@ import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/meal_suggestion.dart';
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
+import 'package:ai_nutrition_companion/domain/repositories/ai_chat_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
 import 'package:ai_nutrition_companion/features/today/today_screen.dart';
 import 'package:ai_nutrition_companion/services/adapters/nutrition_companion_adapter.dart';
@@ -163,6 +164,44 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('Today chat entry opens companion thread with context', (
+    tester,
+  ) async {
+    final chatRepository = InMemoryAiChatRepository();
+
+    await tester.pumpWidget(
+      _wrap(
+        TodayScreen(
+          profile: profile,
+          adapter: _FixtureAdapter([firstSuggestion]),
+          chatRepository: chatRepository,
+        ),
+      ),
+    );
+
+    await _scrollUntilVisible(tester, find.text('Ask the companion'));
+
+    final chatField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.hintText ==
+              'Ask what to eat, why, or how to adjust',
+    );
+    await tester.enterText(chatField, 'How can I hit my protein goal today?');
+    await tester.tap(find.text('Ask'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Companion'), findsOneWidget);
+    expect(find.text('How can I hit my protein goal today?'), findsOneWidget);
+    expect(find.textContaining('45g protein left'), findsWidgets);
+    expect(find.textContaining('Skyr bowl with berries'), findsWidgets);
+
+    final messages = await chatRepository.loadMessages();
+    expect(messages, hasLength(2));
+    expect(messages.first.content, 'How can I hit my protein goal today?');
+    expect(messages.last.content, contains('45g protein left'));
   });
 
   testWidgets('empty fixture data renders a graceful Today state', (
