@@ -1,4 +1,4 @@
-package com.example.ai_nutrition_companion
+package app.ainutrition.companion
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -30,9 +30,17 @@ privacy policy, production package identifiers, and current platform rules.
 Current app facts from this repository:
 
 - Flutter app for iOS and Android.
-- Package name is still a placeholder:
-  `com.example.ai_nutrition_companion`.
-- Android release signing currently uses the debug signing config.
+- Android production application id defaults to `app.ainutrition.companion`.
+- Android production application id can be overridden at build time with
+  `AI_NUTRITION_ANDROID_APPLICATION_ID`.
+- Android release signing is wired to an external `release` signing config. It
+  reads `android/key.properties`, Gradle properties, or environment variables
+  and no longer falls back to debug signing.
+- iOS bundle id defaults to `app.ainutrition.companion` through
+  `AI_NUTRITION_IOS_BUNDLE_ID` in the Flutter xcconfig files.
+- iOS development team is intentionally blank in source control and must be set
+  through `AI_NUTRITION_IOS_DEVELOPMENT_TEAM` before device/archive signing.
+- App display name is `AI Nutrition Companion`.
 - `pubspec.yaml` version is `1.0.0+1`.
 - Android currently declares `android.permission.CAMERA`.
 - iOS currently declares camera and photo library usage descriptions.
@@ -49,9 +57,13 @@ Current app facts from this repository:
 
 ## Must Fix Before Store Submission
 
-- Replace Android `applicationId` with the production package id.
-- Replace Android debug signing with a real release signing configuration.
-- Confirm iOS bundle identifier, team, signing, entitlements, and display name.
+- Confirm the final Android application id and iOS bundle id are owned by the
+  release owner. The committed defaults are production-shaped placeholders, not
+  proof of store ownership.
+- Provide Android upload signing credentials through `android/key.properties`,
+  Gradle properties, or environment variables.
+- Confirm iOS signing team, provisioning profile, entitlements, and display
+  name in Xcode before archive.
 - Confirm app version and build number for each store submission.
 - Provide production app icons, launch assets, and store screenshots.
 - Provide final privacy policy URL before production distribution.
@@ -96,6 +108,15 @@ categories for V1 review:
 
 ### iOS Build Direction
 
+Committed source defaults:
+
+- Bundle id: `app.ainutrition.companion`.
+- Display name: `AI Nutrition Companion`.
+- Bundle id override: update `AI_NUTRITION_IOS_BUNDLE_ID` in
+  `ios/Flutter/Debug.xcconfig` and `ios/Flutter/Release.xcconfig`.
+- Signing team: set `AI_NUTRITION_IOS_DEVELOPMENT_TEAM` locally or in Xcode.
+  The committed value is blank so no private team identifier is implied.
+
 Local verification:
 
 ```sh
@@ -113,9 +134,11 @@ open ios/Runner.xcworkspace
 
 Before archiving:
 
-- Confirm `PRODUCT_BUNDLE_IDENTIFIER`.
-- Confirm signing team and provisioning profile.
-- Confirm `CFBundleDisplayName`.
+- Confirm `PRODUCT_BUNDLE_IDENTIFIER` resolves to the release-owned bundle id.
+- Confirm signing team and provisioning profile. Do not commit provisioning
+  profiles, certificates, private keys, or personal Apple team secrets.
+- Confirm `CFBundleDisplayName` remains `AI Nutrition Companion` or the final
+  approved store name.
 - Confirm `NSCameraUsageDescription` and `NSPhotoLibraryUsageDescription`.
 - Add health entitlements only when HealthKit is implemented and justified.
 - Confirm App Transport Security settings if real network providers are added.
@@ -148,6 +171,36 @@ Complete the Data safety form from final behavior. Review these V1 data areas:
 
 ### Android Build Direction
 
+Committed source defaults:
+
+- Application id and namespace: `app.ainutrition.companion`.
+- App label: `AI Nutrition Companion`.
+- Application id override: pass
+  `-PAI_NUTRITION_ANDROID_APPLICATION_ID=<owned.package.id>` or set the
+  matching environment variable.
+- Release signing config name: `release`.
+- Release signing file path: `android/key.properties` if using a local file.
+  This file is ignored by git.
+
+Supported Android signing inputs:
+
+```properties
+storeFile=/absolute/path/to/upload-keystore.jks
+storePassword=...
+keyAlias=...
+keyPassword=...
+```
+
+The same values may be provided as Gradle properties, or with environment
+variables:
+
+```text
+AI_NUTRITION_UPLOAD_STORE_FILE
+AI_NUTRITION_UPLOAD_STORE_PASSWORD
+AI_NUTRITION_UPLOAD_KEY_ALIAS
+AI_NUTRITION_UPLOAD_KEY_PASSWORD
+```
+
 Local verification:
 
 ```sh
@@ -159,8 +212,10 @@ flutter build appbundle --release
 
 Before creating an app bundle:
 
-- Replace `com.example.ai_nutrition_companion`.
-- Configure release signing outside source control.
+- Confirm `app.ainutrition.companion` or the override id is the final
+  release-owned Play package id.
+- Configure release signing outside source control. The release build must not
+  use debug signing.
 - Confirm `minSdk`, `targetSdk`, and Play target API requirements.
 - Confirm Android camera permission is requested only when the user chooses a
   camera meal-logging action.
@@ -354,8 +409,9 @@ Run the matrix before public testing or production submission.
 
 Use this as the final go/no-go list.
 
-- [ ] Production package id and bundle id are set.
-- [ ] Release signing is configured outside source control.
+- [ ] Production package id and bundle id are confirmed as release-owned.
+- [ ] Android upload signing and iOS signing team/profile are configured outside
+  source control.
 - [ ] Version and build number are correct.
 - [ ] App icons and launch assets are final.
 - [ ] App Store and Play metadata are drafted and reviewed.
