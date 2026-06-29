@@ -1,4 +1,6 @@
-enum NutritionSource { aiEstimated, userConfirmed, databaseVerified, fallback }
+import 'nutrition.dart';
+
+export 'nutrition.dart' show NutritionSource;
 
 class MealSuggestion {
   const MealSuggestion({
