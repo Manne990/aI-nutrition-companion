@@ -86,7 +86,13 @@ analysis, and tests.
 
 ## Environment Variables
 
-No environment variables are required for the V1 bootstrap.
+No environment variables are required for the default V1 local app. Nutrition
+lookup uses deterministic mock/local adapters unless a real provider is wired.
+
+The FoodData Central adapter contract reports an explicit missing-key fallback
+state when `FOODDATA_CENTRAL_API_KEY` is absent. A future network-backed
+implementation should read that variable outside the mobile binary and must not
+ship production secrets in the app.
 
 Future AI provider work must not hard-code production API keys in the mobile
 app. User-provided tokens should be stored on device when secure platform

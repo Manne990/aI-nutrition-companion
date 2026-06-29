@@ -34,6 +34,75 @@ class SourceMetadata {
   }
 }
 
+enum NutritionLookupStatus {
+  verified,
+  fallback,
+  notFound,
+  missingApiKey,
+  providerError,
+}
+
+class NutritionLookupQuery {
+  const NutritionLookupQuery({
+    required this.foodName,
+    this.barcode,
+    this.servingDescription,
+  });
+
+  final String foodName;
+  final String? barcode;
+  final String? servingDescription;
+
+  String get normalizedFoodName => normalizeFoodName(foodName);
+}
+
+class NutritionLookupResult {
+  const NutritionLookupResult({
+    required this.query,
+    required this.status,
+    required this.providerName,
+    this.food,
+    this.message,
+  });
+
+  final NutritionLookupQuery query;
+  final NutritionLookupStatus status;
+  final String providerName;
+  final FoodItem? food;
+  final String? message;
+
+  bool get hasFood => food != null;
+
+  bool get isVerified => status == NutritionLookupStatus.verified;
+
+  bool get isFallback => status == NutritionLookupStatus.fallback;
+
+  bool get isProviderUnavailable =>
+      status == NutritionLookupStatus.missingApiKey ||
+      status == NutritionLookupStatus.providerError;
+}
+
+class MealEnrichment {
+  const MealEnrichment({required this.items, required this.lookupResults});
+
+  final List<MealItem> items;
+  final List<NutritionLookupResult> lookupResults;
+
+  MacroTotals get knownMacroTotals => sumKnownMacros(items);
+
+  int get itemsWithMissingNutrition =>
+      items.where((item) => !item.hasKnownNutrition).length;
+
+  bool get hasFallbackNutrition =>
+      items.any((item) => item.food.source.source == NutritionSource.fallback);
+
+  bool get hasUnverifiedAiNutrition => items.any(
+    (item) =>
+        item.source.source == NutritionSource.aiEstimated &&
+        !item.food.source.isVerified,
+  );
+}
+
 class MacroTotals {
   const MacroTotals({
     required this.calories,
@@ -112,6 +181,24 @@ class MealItem {
   MacroTotals? get macroTotals => food.nutritionPerServing?.scale(servings);
 
   bool get hasKnownNutrition => macroTotals != null;
+
+  MealItem copyWith({
+    String? id,
+    FoodItem? food,
+    double? servings,
+    SourceMetadata? source,
+    String? userNote,
+    String? replacesEstimateId,
+  }) {
+    return MealItem(
+      id: id ?? this.id,
+      food: food ?? this.food,
+      servings: servings ?? this.servings,
+      source: source ?? this.source,
+      userNote: userNote ?? this.userNote,
+      replacesEstimateId: replacesEstimateId ?? this.replacesEstimateId,
+    );
+  }
 
   MealItem userCorrected({
     required String id,
@@ -308,4 +395,13 @@ bool _isSameDay(DateTime a, DateTime b) {
 
 DateTime _endOfDay(DateTime date) {
   return DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
+}
+
+String normalizeFoodName(String value) {
+  return value
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
