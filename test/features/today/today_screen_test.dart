@@ -1,5 +1,7 @@
 import 'package:ai_nutrition_companion/app/theme/app_theme.dart';
 import 'package:ai_nutrition_companion/domain/models/meal_suggestion.dart';
+import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
+import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
 import 'package:ai_nutrition_companion/features/today/today_screen.dart';
 import 'package:ai_nutrition_companion/services/adapters/nutrition_companion_adapter.dart';
@@ -28,10 +30,23 @@ class _FixtureAdapter implements NutritionCompanionAdapter {
   final List<MealSuggestion> suggestions;
 
   @override
-  List<MealSuggestion> mealSuggestions() => suggestions;
+  List<MealSuggestion> mealSuggestions({UserPreferences? preferences}) {
+    return suggestions;
+  }
 }
 
 void main() {
+  final profile = OnboardingProfile(
+    primaryGoal: 'Build steady high-protein habits',
+    proteinGoalGrams: 110,
+    dietaryPreferences: const ['high protein'],
+    coachingTone: 'calm and practical',
+    acceptedNutritionDisclaimer: true,
+    acceptedAiGuidanceDisclaimer: true,
+    acceptedPrivacyBoundary: true,
+    completedAt: DateTime(2026, 6, 29),
+  );
+
   const firstSuggestion = MealSuggestion(
     title: 'Skyr bowl with berries',
     summary: 'Quick protein with fruit and a gentle texture.',
@@ -61,7 +76,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       _wrap(
-        const TodayScreen(
+        TodayScreen(
+          profile: profile,
           adapter: _FixtureAdapter([firstSuggestion, secondSuggestion]),
         ),
       ),
@@ -94,7 +110,8 @@ void main() {
   testWidgets('suggestion actions update visible local state', (tester) async {
     await tester.pumpWidget(
       _wrap(
-        const TodayScreen(
+        TodayScreen(
+          profile: profile,
           adapter: _FixtureAdapter([firstSuggestion, secondSuggestion]),
         ),
       ),
@@ -137,6 +154,7 @@ void main() {
     await tester.pumpWidget(
       _wrap(
         TodayScreen(
+          profile: profile,
           adapter: const _FixtureAdapter([]),
           repository: InMemoryNutritionRepository(seedMeals: const []),
         ),
@@ -165,7 +183,8 @@ void main() {
 
       await tester.pumpWidget(
         _wrap(
-          const TodayScreen(
+          TodayScreen(
+            profile: profile,
             adapter: _FixtureAdapter([firstSuggestion, secondSuggestion]),
           ),
         ),
