@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../domain/models/ai_settings.dart';
+import '../../domain/models/health.dart';
 import '../../domain/models/onboarding.dart';
 import '../../domain/repositories/ai_settings_repository.dart';
+import '../../domain/repositories/health_repository.dart';
 import '../../shared/widgets/app_action_buttons.dart';
 import '../../shared/widgets/app_chip.dart';
 import '../../shared/widgets/app_section_card.dart';
@@ -13,13 +15,19 @@ class MeScreen extends StatefulWidget {
     super.key,
     required this.profile,
     required this.aiSettingsRepository,
+    required this.healthRepository,
+    required this.healthState,
     required this.onAiSettingsChanged,
+    required this.onHealthStateChanged,
     required this.onResetOnboarding,
   });
 
   final OnboardingProfile profile;
   final AiSettingsRepository aiSettingsRepository;
+  final HealthRepository healthRepository;
+  final HealthConnectionState healthState;
   final Future<void> Function() onAiSettingsChanged;
+  final Future<void> Function() onHealthStateChanged;
   final Future<void> Function() onResetOnboarding;
 
   @override
@@ -28,20 +36,31 @@ class MeScreen extends StatefulWidget {
 
 class _MeScreenState extends State<MeScreen> {
   late Future<_AiSettingsViewState> _aiSettingsFuture;
+  late HealthConnectionState _healthState;
   final TextEditingController _tokenController = TextEditingController();
   AiProviderSettings? _draftSettings;
   String? _statusMessage;
+  String? _healthStatusMessage;
 
   @override
   void initState() {
     super.initState();
     _aiSettingsFuture = _loadAiSettings();
+    _healthState = widget.healthState;
   }
 
   @override
   void dispose() {
     _tokenController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant MeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.healthState != widget.healthState) {
+      _healthState = widget.healthState;
+    }
   }
 
   Future<_AiSettingsViewState> _loadAiSettings() async {
@@ -98,6 +117,8 @@ class _MeScreenState extends State<MeScreen> {
             return _buildAiSettingsCard(context, snapshot.requireData);
           },
         ),
+        const SizedBox(height: 16),
+        _buildHealthConnectionCard(context),
         const SizedBox(height: 16),
         AppSectionCard(
           title: 'Health and privacy',
@@ -265,6 +286,76 @@ class _MeScreenState extends State<MeScreen> {
     );
   }
 
+  Widget _buildHealthConnectionCard(BuildContext context) {
+    final healthState = _healthState;
+    final signalLabels = _signalLabels(healthState.signals);
+    final enabledLabels = healthState.enabledTypes
+        .map((type) => type.label)
+        .toList(growable: false);
+
+    return AppSectionCard(
+      title: 'Health connection',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(healthState.explainer),
+          if (healthState.statusDetail != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              healthState.statusDetail!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppChip(
+                label: healthState.statusLabel,
+                icon: _healthStatusIcon(healthState.status),
+                tone: _healthStatusTone(healthState.status),
+              ),
+              AppChip(
+                label: healthState.providerLabel,
+                icon: Icons.health_and_safety_outlined,
+              ),
+              for (final label in enabledLabels)
+                AppChip(label: label, icon: Icons.check_circle_outline),
+              for (final label in signalLabels) AppChip(label: label),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (healthState.isConnected)
+            AppSecondaryButton(
+              label: 'Disconnect health',
+              icon: Icons.link_off,
+              onPressed: _disconnectHealth,
+            )
+          else
+            AppPrimaryButton(
+              label: 'Connect health',
+              icon: Icons.health_and_safety_outlined,
+              onPressed:
+                  healthState.status == HealthConnectionStatus.unavailable
+                  ? null
+                  : _connectHealth,
+            ),
+          if (_healthStatusMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppChip(
+              label: _healthStatusMessage!,
+              icon: Icons.info_outline,
+              tone: AppChipTone.accent,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveAiSettings() async {
     final settings = _draftSettings ?? AiProviderSettings.defaults;
     await widget.aiSettingsRepository.saveSettings(settings);
@@ -302,6 +393,29 @@ class _MeScreenState extends State<MeScreen> {
     });
   }
 
+  Future<void> _connectHealth() async {
+    final nextState = await widget.healthRepository.requestConnection();
+    await widget.onHealthStateChanged();
+    setState(() {
+      _healthState = nextState;
+      _healthStatusMessage = switch (nextState.status) {
+        HealthConnectionStatus.connected => 'Health connection enabled.',
+        HealthConnectionStatus.denied => 'Health permission denied.',
+        HealthConnectionStatus.unavailable => 'Health connection unavailable.',
+        HealthConnectionStatus.disconnected => 'Health connection remains off.',
+      };
+    });
+  }
+
+  Future<void> _disconnectHealth() async {
+    final nextState = await widget.healthRepository.disconnect();
+    await widget.onHealthStateChanged();
+    setState(() {
+      _healthState = nextState;
+      _healthStatusMessage = 'Health connection disconnected.';
+    });
+  }
+
   String _providerStatus(AiProviderSettings settings, AiTokenState tokenState) {
     if (settings.usesMockProvider) {
       return 'Mock AI is the default for tests and local CI. No token is required.';
@@ -311,6 +425,37 @@ class _MeScreenState extends State<MeScreen> {
     }
     return '${settings.option.label} is selected with ${settings.model}. Add a token before real provider mode can be used.';
   }
+}
+
+List<String> _signalLabels(HealthSignalSnapshot? signals) {
+  if (signals == null || !signals.hasSignals) {
+    return const [];
+  }
+  return [
+    if (signals.weightKg != null) '${signals.weightKg!.toStringAsFixed(1)} kg',
+    if (signals.activeMinutes != null) '${signals.activeMinutes} min active',
+    if (signals.workoutCount != null) '${signals.workoutCount} workout',
+    if (signals.sleepHours != null)
+      '${signals.sleepHours!.toStringAsFixed(1)}h sleep',
+  ];
+}
+
+IconData _healthStatusIcon(HealthConnectionStatus status) {
+  return switch (status) {
+    HealthConnectionStatus.connected => Icons.check_circle_outline,
+    HealthConnectionStatus.disconnected => Icons.radio_button_unchecked,
+    HealthConnectionStatus.denied => Icons.block,
+    HealthConnectionStatus.unavailable => Icons.error_outline,
+  };
+}
+
+AppChipTone _healthStatusTone(HealthConnectionStatus status) {
+  return switch (status) {
+    HealthConnectionStatus.connected => AppChipTone.success,
+    HealthConnectionStatus.disconnected => AppChipTone.neutral,
+    HealthConnectionStatus.denied => AppChipTone.accent,
+    HealthConnectionStatus.unavailable => AppChipTone.accent,
+  };
 }
 
 class _AiSettingsViewState {

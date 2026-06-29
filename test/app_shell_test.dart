@@ -1,6 +1,7 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
+import 'package:ai_nutrition_companion/domain/repositories/health_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/onboarding_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,6 +28,7 @@ Future<void> _pumpApp(
       onboardingRepository:
           repository ?? InMemoryOnboardingRepository(_profile()),
       aiSettingsRepository: InMemoryAiSettingsRepository(),
+      healthRepository: InMemoryHealthRepository(),
     ),
   );
   await tester.pumpAndSettle();

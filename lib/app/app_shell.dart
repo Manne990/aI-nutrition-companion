@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../domain/models/ai_settings.dart';
+import '../domain/models/health.dart';
 import '../domain/models/onboarding.dart';
 import '../domain/repositories/ai_settings_repository.dart';
+import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
 import '../features/kitchen/kitchen_screen.dart';
 import '../features/me/me_screen.dart';
@@ -16,10 +18,12 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.onboardingRepository,
     required this.aiSettingsRepository,
+    required this.healthRepository,
   });
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
+  final HealthRepository healthRepository;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -29,6 +33,9 @@ class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   late Future<OnboardingProfile?> _profileFuture;
   late Future<AiAdapterConfiguration> _aiConfigurationFuture;
+  late Future<HealthConnectionState> _healthStateFuture;
+  late Future<({AiAdapterConfiguration ai, HealthConnectionState health})>
+  _runtimeStateFuture;
   OnboardingProfile? _profile;
 
   static const _destinations = <NavigationDestination>[
@@ -55,6 +62,8 @@ class _AppShellState extends State<AppShell> {
     _profileFuture = widget.onboardingRepository.loadProfile();
     _aiConfigurationFuture = widget.aiSettingsRepository
         .loadAdapterConfiguration();
+    _healthStateFuture = widget.healthRepository.loadState();
+    _runtimeStateFuture = _loadRuntimeState();
   }
 
   @override
@@ -74,10 +83,12 @@ class _AppShellState extends State<AppShell> {
           return OnboardingScreen(onCompleted: _completeOnboarding);
         }
 
-        return FutureBuilder<AiAdapterConfiguration>(
-          future: _aiConfigurationFuture,
-          builder: (context, aiSnapshot) {
-            if (!aiSnapshot.hasData) {
+        return FutureBuilder<
+          ({AiAdapterConfiguration ai, HealthConnectionState health})
+        >(
+          future: _runtimeStateFuture,
+          builder: (context, runtimeSnapshot) {
+            if (!runtimeSnapshot.hasData) {
               return const Scaffold(
                 body: SafeArea(
                   child: Center(child: CircularProgressIndicator()),
@@ -85,7 +96,8 @@ class _AppShellState extends State<AppShell> {
               );
             }
 
-            final aiConfiguration = aiSnapshot.requireData;
+            final aiConfiguration = runtimeSnapshot.requireData.ai;
+            final healthState = runtimeSnapshot.requireData.health;
             final screens = <Widget>[
               TodayScreen(
                 profile: profile,
@@ -95,12 +107,18 @@ class _AppShellState extends State<AppShell> {
                 mealRecognitionAdapter: MockMealRecognitionAdapter(
                   configuration: aiConfiguration,
                 ),
+                healthSignals: healthState.isConnected
+                    ? healthState.signals
+                    : null,
               ),
               const KitchenScreen(),
               MeScreen(
                 profile: profile,
                 aiSettingsRepository: widget.aiSettingsRepository,
+                healthRepository: widget.healthRepository,
+                healthState: healthState,
                 onAiSettingsChanged: _reloadAiConfiguration,
+                onHealthStateChanged: _reloadHealthState,
                 onResetOnboarding: _resetOnboarding,
               ),
             ];
@@ -146,6 +164,19 @@ class _AppShellState extends State<AppShell> {
     setState(() {
       _aiConfigurationFuture = widget.aiSettingsRepository
           .loadAdapterConfiguration();
+      _runtimeStateFuture = _loadRuntimeState();
     });
+  }
+
+  Future<void> _reloadHealthState() async {
+    setState(() {
+      _healthStateFuture = widget.healthRepository.loadState();
+      _runtimeStateFuture = _loadRuntimeState();
+    });
+  }
+
+  Future<({AiAdapterConfiguration ai, HealthConnectionState health})>
+  _loadRuntimeState() async {
+    return (ai: await _aiConfigurationFuture, health: await _healthStateFuture);
   }
 }
