@@ -84,4 +84,64 @@ void main() {
       expect((await repository.loadTokenState()).hasToken, isTrue);
     },
   );
+
+  test(
+    'shared preferences repository falls back for corrupt settings JSON',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesAiSettingsRepository.settingsKey: '{"provider":',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final tokenStorage = InMemoryAiTokenStorage();
+      final repository = SharedPreferencesAiSettingsRepository(
+        preferences,
+        tokenStorage: tokenStorage,
+      );
+
+      await repository.saveToken('sk-secret-token');
+      final settings = await repository.loadSettings();
+
+      expect(settings, AiProviderSettings.defaults);
+      expect((await repository.loadTokenState()).hasToken, isTrue);
+      expect(
+        preferences
+            .getString(SharedPreferencesAiSettingsRepository.settingsKey)
+            .toString(),
+        isNot(contains('sk-secret-token')),
+      );
+    },
+  );
+
+  test(
+    'shared preferences repository falls back for wrong settings shape',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesAiSettingsRepository.settingsKey: '["openai"]',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesAiSettingsRepository(
+        preferences,
+        tokenStorage: InMemoryAiTokenStorage(),
+      );
+
+      expect(await repository.loadSettings(), AiProviderSettings.defaults);
+    },
+  );
+
+  test(
+    'shared preferences repository falls back for incompatible setting fields',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesAiSettingsRepository.settingsKey:
+            '{"provider": 123, "model": true}',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesAiSettingsRepository(
+        preferences,
+        tokenStorage: InMemoryAiTokenStorage(),
+      );
+
+      expect(await repository.loadSettings(), AiProviderSettings.defaults);
+    },
+  );
 }

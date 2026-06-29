@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/ai_settings.dart';
+import 'persisted_json.dart';
 
 abstract interface class AiSettingsRepository {
   Future<AiProviderSettings> loadSettings();
@@ -87,14 +88,16 @@ class SharedPreferencesAiSettingsRepository implements AiSettingsRepository {
       return AiProviderSettings.defaults;
     }
 
-    final decoded = jsonDecode(rawSettings);
-    if (decoded is! Map) {
+    final decoded = decodePersistedJsonMap(rawSettings);
+    if (decoded == null) {
       return AiProviderSettings.defaults;
     }
 
-    return AiProviderSettings.fromJson(
-      Map<String, Object?>.from(decoded),
-    ).normalized();
+    try {
+      return AiProviderSettings.fromJson(decoded).normalized();
+    } on TypeError {
+      return AiProviderSettings.defaults;
+    }
   }
 
   @override

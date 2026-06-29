@@ -48,4 +48,47 @@ void main() {
       expect(restored.last.content, 'Try the skyr bowl.');
     },
   );
+
+  test(
+    'shared preferences repository ignores corrupt persisted chat JSON',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesAiChatRepository.messagesKey: '[not json',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesAiChatRepository(preferences);
+
+      expect(await repository.loadMessages(), isEmpty);
+    },
+  );
+
+  test(
+    'shared preferences repository ignores wrong persisted chat shape',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesAiChatRepository.messagesKey: '{"messages": []}',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesAiChatRepository(preferences);
+
+      expect(await repository.loadMessages(), isEmpty);
+    },
+  );
+
+  test('shared preferences repository skips malformed chat items', () async {
+    SharedPreferences.setMockInitialValues({
+      SharedPreferencesAiChatRepository.messagesKey:
+          '[{"id":"valid","role":"user","content":"Keep this","createdAt":"2026-06-29T15:30:00.000"},'
+          '{"id": 42, "role": "assistant", "content": true, "createdAt": false},'
+          '{"id":"empty","role":"assistant","content":"   ","createdAt":"2026-06-29T15:31:00.000"}]',
+    });
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SharedPreferencesAiChatRepository(preferences);
+
+    final restored = await repository.loadMessages();
+
+    expect(restored, hasLength(1));
+    expect(restored.single.id, 'valid');
+    expect(restored.single.content, 'Keep this');
+  });
 }
