@@ -1,1 +1,3 @@
 #include "Generated.xcconfig"
+AI_NUTRITION_IOS_BUNDLE_ID=app.ainutrition.companion
+AI_NUTRITION_IOS_DEVELOPMENT_TEAM=

@@ -1,11 +1,29 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val androidApplicationId =
+    providers.gradleProperty("AI_NUTRITION_ANDROID_APPLICATION_ID").orNull
+        ?: System.getenv("AI_NUTRITION_ANDROID_APPLICATION_ID")
+        ?: "app.ainutrition.companion"
+
+val releaseKeystoreProperties = Properties()
+val releaseKeystorePropertiesFile = rootProject.file("key.properties")
+if (releaseKeystorePropertiesFile.exists()) {
+    releaseKeystorePropertiesFile.inputStream().use { releaseKeystoreProperties.load(it) }
+}
+
+fun releaseSigningValue(propertyName: String, environmentName: String): String? =
+    releaseKeystoreProperties.getProperty(propertyName)
+        ?: providers.gradleProperty(propertyName).orNull
+        ?: System.getenv(environmentName)
+
 android {
-    namespace = "com.example.ai_nutrition_companion"
+    namespace = "app.ainutrition.companion"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,8 +33,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.ai_nutrition_companion"
+        applicationId = androidApplicationId
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -25,11 +42,30 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val storeFilePath = releaseSigningValue(
+                "storeFile",
+                "AI_NUTRITION_UPLOAD_STORE_FILE",
+            )
+            if (storeFilePath != null) {
+                storeFile = file(storeFilePath)
+            }
+            storePassword = releaseSigningValue(
+                "storePassword",
+                "AI_NUTRITION_UPLOAD_STORE_PASSWORD",
+            )
+            keyAlias = releaseSigningValue("keyAlias", "AI_NUTRITION_UPLOAD_KEY_ALIAS")
+            keyPassword = releaseSigningValue(
+                "keyPassword",
+                "AI_NUTRITION_UPLOAD_KEY_PASSWORD",
+            )
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
