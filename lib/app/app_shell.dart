@@ -6,6 +6,7 @@ import '../domain/models/onboarding.dart';
 import '../domain/repositories/ai_chat_repository.dart';
 import '../domain/repositories/ai_settings_repository.dart';
 import '../domain/repositories/health_repository.dart';
+import '../domain/repositories/nutrition_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
 import '../features/kitchen/kitchen_screen.dart';
 import '../features/me/me_screen.dart';
@@ -21,12 +22,14 @@ class AppShell extends StatefulWidget {
     required this.aiSettingsRepository,
     required this.healthRepository,
     required this.aiChatRepository,
+    this.nutritionRepository,
   });
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
   final HealthRepository healthRepository;
   final AiChatRepository aiChatRepository;
+  final NutritionRepository? nutritionRepository;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -39,7 +42,9 @@ class _AppShellState extends State<AppShell> {
   late Future<HealthConnectionState> _healthStateFuture;
   late Future<({AiAdapterConfiguration ai, HealthConnectionState health})>
   _runtimeStateFuture;
+  late Future<NutritionRepository> _nutritionRepositoryFuture;
   OnboardingProfile? _profile;
+  OnboardingProfile? _nutritionRepositoryProfile;
 
   static const _destinations = <NavigationDestination>[
     NavigationDestination(
@@ -86,6 +91,8 @@ class _AppShellState extends State<AppShell> {
           return OnboardingScreen(onCompleted: _completeOnboarding);
         }
 
+        _ensureNutritionRepository(profile);
+
         return FutureBuilder<
           ({AiAdapterConfiguration ai, HealthConnectionState health})
         >(
@@ -101,45 +108,63 @@ class _AppShellState extends State<AppShell> {
 
             final aiConfiguration = runtimeSnapshot.requireData.ai;
             final healthState = runtimeSnapshot.requireData.health;
-            final screens = <Widget>[
-              TodayScreen(
-                profile: profile,
-                adapter: MockNutritionCompanionAdapter(
-                  configuration: aiConfiguration,
-                ),
-                chatRepository: widget.aiChatRepository,
-                aiConfiguration: aiConfiguration,
-                mealRecognitionAdapter: MockMealRecognitionAdapter(
-                  configuration: aiConfiguration,
-                ),
-                healthSignals: healthState.isConnected
-                    ? healthState.signals
-                    : null,
-              ),
-              const KitchenScreen(),
-              MeScreen(
-                profile: profile,
-                aiSettingsRepository: widget.aiSettingsRepository,
-                healthRepository: widget.healthRepository,
-                healthState: healthState,
-                onAiSettingsChanged: _reloadAiConfiguration,
-                onHealthStateChanged: _reloadHealthState,
-                onResetOnboarding: _resetOnboarding,
-              ),
-            ];
+            return FutureBuilder<NutritionRepository>(
+              future: _nutritionRepositoryFuture,
+              builder: (context, nutritionSnapshot) {
+                if (!nutritionSnapshot.hasData) {
+                  return const Scaffold(
+                    body: SafeArea(
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  );
+                }
 
-            return Scaffold(
-              body: SafeArea(
-                bottom: false,
-                child: IndexedStack(index: _selectedIndex, children: screens),
-              ),
-              bottomNavigationBar: NavigationBar(
-                selectedIndex: _selectedIndex,
-                destinations: _destinations,
-                onDestinationSelected: (index) {
-                  setState(() => _selectedIndex = index);
-                },
-              ),
+                final nutritionRepository = nutritionSnapshot.requireData;
+                final screens = <Widget>[
+                  TodayScreen(
+                    profile: profile,
+                    adapter: MockNutritionCompanionAdapter(
+                      configuration: aiConfiguration,
+                    ),
+                    repository: nutritionRepository,
+                    chatRepository: widget.aiChatRepository,
+                    aiConfiguration: aiConfiguration,
+                    mealRecognitionAdapter: MockMealRecognitionAdapter(
+                      configuration: aiConfiguration,
+                    ),
+                    healthSignals: healthState.isConnected
+                        ? healthState.signals
+                        : null,
+                  ),
+                  KitchenScreen(repository: nutritionRepository),
+                  MeScreen(
+                    profile: profile,
+                    aiSettingsRepository: widget.aiSettingsRepository,
+                    healthRepository: widget.healthRepository,
+                    healthState: healthState,
+                    onAiSettingsChanged: _reloadAiConfiguration,
+                    onHealthStateChanged: _reloadHealthState,
+                    onResetOnboarding: _resetOnboarding,
+                  ),
+                ];
+
+                return Scaffold(
+                  body: SafeArea(
+                    bottom: false,
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: screens,
+                    ),
+                  ),
+                  bottomNavigationBar: NavigationBar(
+                    selectedIndex: _selectedIndex,
+                    destinations: _destinations,
+                    onDestinationSelected: (index) {
+                      setState(() => _selectedIndex = index);
+                    },
+                  ),
+                );
+              },
             );
           },
         );
@@ -153,6 +178,7 @@ class _AppShellState extends State<AppShell> {
       _profile = profile;
       _selectedIndex = 0;
       _profileFuture = Future.value(profile);
+      _nutritionRepositoryProfile = null;
     });
   }
 
@@ -183,5 +209,28 @@ class _AppShellState extends State<AppShell> {
   Future<({AiAdapterConfiguration ai, HealthConnectionState health})>
   _loadRuntimeState() async {
     return (ai: await _aiConfigurationFuture, health: await _healthStateFuture);
+  }
+
+  void _ensureNutritionRepository(OnboardingProfile profile) {
+    if (_nutritionRepositoryProfile == profile) {
+      return;
+    }
+
+    _nutritionRepositoryProfile = profile;
+    _nutritionRepositoryFuture = _loadNutritionRepository(profile);
+  }
+
+  Future<NutritionRepository> _loadNutritionRepository(
+    OnboardingProfile profile,
+  ) async {
+    final repository = widget.nutritionRepository;
+    if (repository != null) {
+      return repository;
+    }
+
+    return SharedPreferencesNutritionRepository.create(
+      seedGoal: profile.toNutritionGoal(calories: 2200),
+      seedPreferences: profile.toUserPreferences(),
+    );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('buildDailySummary', () {
@@ -258,6 +259,152 @@ void main() {
             .availability,
         IngredientAvailability.runningLow,
       );
+    });
+  });
+
+  group('SharedPreferencesNutritionRepository', () {
+    test('falls back to seed data when persisted JSON is corrupt', () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesNutritionRepository.stateKey: '{not json',
+      });
+      final preferences = await SharedPreferences.getInstance();
+
+      final repository = SharedPreferencesNutritionRepository(preferences);
+
+      expect(repository.meals().map((meal) => meal.id), [
+        'meal-breakfast',
+        'meal-lunch',
+      ]);
+      expect(repository.weightEntries().single.id, 'weight-start');
+    });
+
+    test(
+      'falls back to seed data when persisted state has wrong shape',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          SharedPreferencesNutritionRepository.stateKey:
+              '{"version":1,"meals":"bad","weightEntries":[]}',
+        });
+        final preferences = await SharedPreferences.getInstance();
+
+        final repository = SharedPreferencesNutritionRepository(preferences);
+
+        expect(repository.meals(), hasLength(2));
+        expect(repository.weightEntries(), hasLength(1));
+      },
+    );
+
+    test(
+      'persists quick logs, photo meals, and weights after recreation',
+      () async {
+        SharedPreferences.setMockInitialValues({});
+        final preferences = await SharedPreferences.getInstance();
+        final repository = SharedPreferencesNutritionRepository(
+          preferences,
+          seedMeals: const [],
+          seedWeightEntries: const [],
+        );
+
+        final suggestion = repository
+            .quickLogSuggestions(DateTime(2026, 6, 29, 16))
+            .first;
+        final quickLog = repository.confirmQuickLogSuggestion(
+          suggestion,
+          eatenAt: DateTime(2026, 6, 29, 16, 5),
+        );
+        final photoMeal = Meal(
+          id: 'photo-dinner',
+          name: 'Photo dinner',
+          eatenAt: DateTime(2026, 6, 29, 19),
+          items: [
+            MealItem(
+              id: 'photo-dinner-item',
+              food: NutritionSeedData.foods.first,
+              servings: 1,
+              source: NutritionSeedData.aiSource,
+            ),
+          ],
+          source: NutritionSeedData.userSource,
+          photoPath: '/tmp/photo-dinner.jpg',
+        );
+        repository.saveMeal(photoMeal);
+        repository.saveWeightEntry(
+          WeightEntry(
+            id: 'weight-evening',
+            recordedAt: DateTime(2026, 6, 29, 21),
+            weightKg: 81.9,
+            source: NutritionSeedData.userSource,
+          ),
+        );
+        await repository.flushPendingWrites();
+
+        final recreated = SharedPreferencesNutritionRepository(
+          preferences,
+          seedMeals: const [],
+          seedWeightEntries: const [],
+        );
+
+        expect(recreated.meals().map((meal) => meal.id), [
+          quickLog.id,
+          photoMeal.id,
+        ]);
+        expect(recreated.meals().last.photoPath, '/tmp/photo-dinner.jpg');
+        expect(recreated.weightEntries().single.weightKg, 81.9);
+        expect(
+          recreated
+              .dailySummary(DateTime(2026, 6, 29))
+              .meals
+              .map((meal) => meal.name),
+          ['Banana snack', 'Photo dinner'],
+        );
+      },
+    );
+
+    test('drops malformed persisted records without crashing', () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final validRepository = SharedPreferencesNutritionRepository(
+        preferences,
+        seedMeals: const [],
+        seedWeightEntries: const [],
+      );
+      final meal = Meal(
+        id: 'valid-meal',
+        name: 'Valid meal',
+        eatenAt: DateTime(2026, 6, 29, 12),
+        items: [
+          MealItem(
+            id: 'valid-item',
+            food: NutritionSeedData.foods.first,
+            servings: 1,
+            source: NutritionSeedData.userSource,
+          ),
+        ],
+        source: NutritionSeedData.userSource,
+      );
+      validRepository.saveMeal(meal);
+      await validRepository.flushPendingWrites();
+
+      final stored = preferences.getString(
+        SharedPreferencesNutritionRepository.stateKey,
+      );
+      await preferences.setString(
+        SharedPreferencesNutritionRepository.stateKey,
+        stored!.replaceFirst(
+          '"items":[{',
+          '"items":["bad-item",{"id":"","food":null},{',
+        ),
+      );
+
+      final recreated = SharedPreferencesNutritionRepository(
+        preferences,
+        seedMeals: const [],
+        seedWeightEntries: const [],
+      );
+
+      expect(recreated.meals(), hasLength(1));
+      expect(recreated.meals().single.items, hasLength(1));
+      expect(recreated.meals().single.items.single.id, 'valid-item');
     });
   });
 }
