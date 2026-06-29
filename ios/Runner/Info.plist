@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>AI Nutrition Companion uses the camera only when you choose to log a meal photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AI Nutrition Companion uses selected photos only to estimate a meal you choose to log.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
