@@ -1,20 +1,55 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../domain/models/ai_settings.dart';
 import '../../domain/models/onboarding.dart';
+import '../../domain/repositories/ai_settings_repository.dart';
 import '../../shared/widgets/app_action_buttons.dart';
 import '../../shared/widgets/app_chip.dart';
 import '../../shared/widgets/app_section_card.dart';
 
-class MeScreen extends StatelessWidget {
+class MeScreen extends StatefulWidget {
   const MeScreen({
     super.key,
     required this.profile,
+    required this.aiSettingsRepository,
+    required this.onAiSettingsChanged,
     required this.onResetOnboarding,
   });
 
   final OnboardingProfile profile;
+  final AiSettingsRepository aiSettingsRepository;
+  final Future<void> Function() onAiSettingsChanged;
   final Future<void> Function() onResetOnboarding;
+
+  @override
+  State<MeScreen> createState() => _MeScreenState();
+}
+
+class _MeScreenState extends State<MeScreen> {
+  late Future<_AiSettingsViewState> _aiSettingsFuture;
+  final TextEditingController _tokenController = TextEditingController();
+  AiProviderSettings? _draftSettings;
+  String? _statusMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _aiSettingsFuture = _loadAiSettings();
+  }
+
+  @override
+  void dispose() {
+    _tokenController.dispose();
+    super.dispose();
+  }
+
+  Future<_AiSettingsViewState> _loadAiSettings() async {
+    final settings = await widget.aiSettingsRepository.loadSettings();
+    final tokenState = await widget.aiSettingsRepository.loadTokenState();
+    _draftSettings = settings;
+    return _AiSettingsViewState(settings: settings, tokenState: tokenState);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,18 +63,22 @@ class MeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(profile.primaryGoal),
+              Text(widget.profile.primaryGoal),
               const SizedBox(height: AppSpacing.sm),
               Wrap(
                 spacing: AppSpacing.xs,
                 runSpacing: AppSpacing.xs,
                 children: [
                   AppChip(
-                    label: '${profile.proteinGoalGrams.round()}g protein',
+                    label:
+                        '${widget.profile.proteinGoalGrams.round()}g protein',
                     icon: Icons.fitness_center,
                   ),
-                  AppChip(label: profile.coachingTone, icon: Icons.chat_bubble),
-                  for (final preference in profile.dietaryPreferences)
+                  AppChip(
+                    label: widget.profile.coachingTone,
+                    icon: Icons.chat_bubble,
+                  ),
+                  for (final preference in widget.profile.dietaryPreferences)
                     AppChip(label: preference),
                 ],
               ),
@@ -47,11 +86,17 @@ class MeScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        const AppSectionCard(
-          title: 'AI provider',
-          child: Text(
-            'Mock mode is enabled until a provider, model, and local token are configured.',
-          ),
+        FutureBuilder<_AiSettingsViewState>(
+          future: _aiSettingsFuture,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const AppSectionCard(
+                title: 'AI provider',
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+            return _buildAiSettingsCard(context, snapshot.requireData);
+          },
         ),
         const SizedBox(height: 16),
         AppSectionCard(
@@ -66,7 +111,7 @@ class MeScreen extends StatelessWidget {
               AppSecondaryButton(
                 label: 'Reset onboarding',
                 icon: Icons.restart_alt,
-                onPressed: onResetOnboarding,
+                onPressed: widget.onResetOnboarding,
               ),
             ],
           ),
@@ -74,4 +119,206 @@ class MeScreen extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildAiSettingsCard(
+    BuildContext context,
+    _AiSettingsViewState viewState,
+  ) {
+    final settings = _draftSettings ?? viewState.settings;
+    final option = settings.option;
+    final tokenState = viewState.tokenState;
+
+    return AppSectionCard(
+      title: 'AI provider',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(_providerStatus(settings, tokenState)),
+          const SizedBox(height: AppSpacing.md),
+          DropdownButtonFormField<AiProvider>(
+            initialValue: settings.provider,
+            decoration: const InputDecoration(labelText: 'Provider'),
+            items: [
+              for (final option in AiProviderCatalog.options)
+                DropdownMenuItem(
+                  value: option.provider,
+                  child: Text(option.label),
+                ),
+            ],
+            onChanged: (provider) {
+              if (provider == null) {
+                return;
+              }
+              setState(() {
+                _draftSettings = settings.copyWith(
+                  provider: provider,
+                  model: AiProviderCatalog.optionFor(provider).defaultModel,
+                );
+                _statusMessage = null;
+              });
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          DropdownButtonFormField<String>(
+            initialValue: settings.model,
+            decoration: const InputDecoration(labelText: 'Model'),
+            items: [
+              for (final model in option.models)
+                DropdownMenuItem(value: model, child: Text(model)),
+            ],
+            onChanged: (model) {
+              if (model == null) {
+                return;
+              }
+              setState(() {
+                _draftSettings = settings.copyWith(model: model);
+                _statusMessage = null;
+              });
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppPrimaryButton(
+            label: 'Save AI settings',
+            icon: Icons.save_outlined,
+            onPressed: _saveAiSettings,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            option.description,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppChip(
+                label: tokenState.hasToken ? 'Token saved' : 'No token saved',
+                icon: tokenState.hasToken
+                    ? Icons.lock_outline
+                    : Icons.lock_open_outlined,
+                tone: tokenState.hasToken
+                    ? AppChipTone.success
+                    : AppChipTone.neutral,
+              ),
+              AppChip(
+                label: tokenState.isSecureStorage
+                    ? 'Secure local storage'
+                    : 'Storage fallback',
+                icon: Icons.security,
+                tone: tokenState.isSecureStorage
+                    ? AppChipTone.success
+                    : AppChipTone.accent,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _tokenController,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Provider token',
+              hintText: 'Paste token to save locally',
+              helperText: 'Saved tokens are never shown again.',
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: AppSecondaryButton(
+                  label: tokenState.hasToken ? 'Update token' : 'Save token',
+                  icon: Icons.key,
+                  onPressed: _saveToken,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: AppSecondaryButton(
+                  label: 'Delete token',
+                  icon: Icons.delete_outline,
+                  onPressed: tokenState.hasToken ? _deleteToken : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            tokenState.errorMessage ??
+                'The token is stored separately from provider settings in ${tokenState.storageLabel}. Delete token removes the local copy from this device.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
+          if (_statusMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppChip(
+              label: _statusMessage!,
+              icon: Icons.check_circle_outline,
+              tone: AppChipTone.success,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveAiSettings() async {
+    final settings = _draftSettings ?? AiProviderSettings.defaults;
+    await widget.aiSettingsRepository.saveSettings(settings);
+    await widget.onAiSettingsChanged();
+    setState(() {
+      _statusMessage = '${settings.option.label} ${settings.model} saved.';
+      _aiSettingsFuture = _loadAiSettings();
+    });
+  }
+
+  Future<void> _saveToken() async {
+    final token = _tokenController.text.trim();
+    if (token.isEmpty) {
+      setState(() {
+        _statusMessage = 'Enter a token before saving.';
+      });
+      return;
+    }
+    await widget.aiSettingsRepository.saveToken(token);
+    await widget.onAiSettingsChanged();
+    setState(() {
+      _tokenController.clear();
+      _statusMessage = 'Token saved locally.';
+      _aiSettingsFuture = _loadAiSettings();
+    });
+  }
+
+  Future<void> _deleteToken() async {
+    await widget.aiSettingsRepository.deleteToken();
+    await widget.onAiSettingsChanged();
+    setState(() {
+      _tokenController.clear();
+      _statusMessage = 'Token deleted from this device.';
+      _aiSettingsFuture = _loadAiSettings();
+    });
+  }
+
+  String _providerStatus(AiProviderSettings settings, AiTokenState tokenState) {
+    if (settings.usesMockProvider) {
+      return 'Mock AI is the default for tests and local CI. No token is required.';
+    }
+    if (tokenState.hasToken) {
+      return '${settings.option.label} is selected with ${settings.model}. Real calls remain stubbed behind the adapter until provider networking is added.';
+    }
+    return '${settings.option.label} is selected with ${settings.model}. Add a token before real provider mode can be used.';
+  }
+}
+
+class _AiSettingsViewState {
+  const _AiSettingsViewState({
+    required this.settings,
+    required this.tokenState,
+  });
+
+  final AiProviderSettings settings;
+  final AiTokenState tokenState;
 }

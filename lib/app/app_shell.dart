@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../domain/models/ai_settings.dart';
 import '../domain/models/onboarding.dart';
+import '../domain/repositories/ai_settings_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
 import '../features/kitchen/kitchen_screen.dart';
 import '../features/me/me_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/today/today_screen.dart';
+import '../services/adapters/meal_recognition_adapter.dart';
+import '../services/adapters/nutrition_companion_adapter.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, required this.onboardingRepository});
+  const AppShell({
+    super.key,
+    required this.onboardingRepository,
+    required this.aiSettingsRepository,
+  });
 
   final OnboardingRepository onboardingRepository;
+  final AiSettingsRepository aiSettingsRepository;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -19,6 +28,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   late Future<OnboardingProfile?> _profileFuture;
+  late Future<AiAdapterConfiguration> _aiConfigurationFuture;
   OnboardingProfile? _profile;
 
   static const _destinations = <NavigationDestination>[
@@ -43,6 +53,8 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _profileFuture = widget.onboardingRepository.loadProfile();
+    _aiConfigurationFuture = widget.aiSettingsRepository
+        .loadAdapterConfiguration();
   }
 
   @override
@@ -62,24 +74,51 @@ class _AppShellState extends State<AppShell> {
           return OnboardingScreen(onCompleted: _completeOnboarding);
         }
 
-        final screens = <Widget>[
-          TodayScreen(profile: profile),
-          const KitchenScreen(),
-          MeScreen(profile: profile, onResetOnboarding: _resetOnboarding),
-        ];
+        return FutureBuilder<AiAdapterConfiguration>(
+          future: _aiConfigurationFuture,
+          builder: (context, aiSnapshot) {
+            if (!aiSnapshot.hasData) {
+              return const Scaffold(
+                body: SafeArea(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }
 
-        return Scaffold(
-          body: SafeArea(
-            bottom: false,
-            child: IndexedStack(index: _selectedIndex, children: screens),
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex,
-            destinations: _destinations,
-            onDestinationSelected: (index) {
-              setState(() => _selectedIndex = index);
-            },
-          ),
+            final aiConfiguration = aiSnapshot.requireData;
+            final screens = <Widget>[
+              TodayScreen(
+                profile: profile,
+                adapter: MockNutritionCompanionAdapter(
+                  configuration: aiConfiguration,
+                ),
+                mealRecognitionAdapter: MockMealRecognitionAdapter(
+                  configuration: aiConfiguration,
+                ),
+              ),
+              const KitchenScreen(),
+              MeScreen(
+                profile: profile,
+                aiSettingsRepository: widget.aiSettingsRepository,
+                onAiSettingsChanged: _reloadAiConfiguration,
+                onResetOnboarding: _resetOnboarding,
+              ),
+            ];
+
+            return Scaffold(
+              body: SafeArea(
+                bottom: false,
+                child: IndexedStack(index: _selectedIndex, children: screens),
+              ),
+              bottomNavigationBar: NavigationBar(
+                selectedIndex: _selectedIndex,
+                destinations: _destinations,
+                onDestinationSelected: (index) {
+                  setState(() => _selectedIndex = index);
+                },
+              ),
+            );
+          },
         );
       },
     );
@@ -100,6 +139,13 @@ class _AppShellState extends State<AppShell> {
       _profile = null;
       _selectedIndex = 0;
       _profileFuture = Future<OnboardingProfile?>.value();
+    });
+  }
+
+  Future<void> _reloadAiConfiguration() async {
+    setState(() {
+      _aiConfigurationFuture = widget.aiSettingsRepository
+          .loadAdapterConfiguration();
     });
   }
 }

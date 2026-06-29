@@ -40,7 +40,8 @@ Current app facts from this repository:
 - `shared_preferences` is present for local app state.
 - No account system exists yet.
 - No backend exists yet.
-- No real AI provider token storage exists yet.
+- User-provided AI token storage is scaffolded through
+  `docs/ai-provider-settings.md` and platform secure storage.
 - No HealthKit or Health Connect integration exists yet.
 - Local CI is `bash scripts/local_ci.sh`.
 
@@ -58,6 +59,8 @@ Current app facts from this repository:
   the app UI before those features become active.
 - Confirm camera/photo permission copy still matches actual behavior.
 - Confirm no production secrets are committed or packaged in the app.
+- Confirm provider/token behavior still matches
+  `docs/ai-provider-settings.md`.
 - Run the release test matrix below on physical or simulator devices.
 
 ## App Store Checklist

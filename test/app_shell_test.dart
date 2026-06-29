@@ -1,5 +1,6 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
+import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/onboarding_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,7 @@ Future<void> _pumpApp(
     AiNutritionCompanionApp(
       onboardingRepository:
           repository ?? InMemoryOnboardingRepository(_profile()),
+      aiSettingsRepository: InMemoryAiSettingsRepository(),
     ),
   );
   await tester.pumpAndSettle();
@@ -120,6 +122,7 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.person_outline));
       await tester.pumpAndSettle();
+      await _scrollUntilVisible(tester, find.text('Reset onboarding'));
       await tester.tap(find.text('Reset onboarding'));
       await tester.pumpAndSettle();
 
