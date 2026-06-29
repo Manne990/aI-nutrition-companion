@@ -16,12 +16,18 @@ Widget _wrap(Widget child) {
 }
 
 Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
-  await tester.scrollUntilVisible(
-    finder,
-    220,
-    scrollable: find.byType(Scrollable),
-  );
-  await tester.pumpAndSettle();
+  final scrollable = find.byType(ListView);
+  for (var attempt = 0; attempt < 12; attempt += 1) {
+    await tester.pump();
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(scrollable, const Offset(0, -260));
+    await tester.pumpAndSettle();
+  }
+  expect(finder, findsOneWidget);
 }
 
 class _FixtureAdapter implements NutritionCompanionAdapter {
@@ -93,6 +99,13 @@ void main() {
     expect(find.text('Afternoon'), findsOneWidget);
     expect(find.text('2h 55m ago'), findsOneWidget);
     expect(find.text('45g left'), findsOneWidget);
+    expect(find.text('Daily overview'), findsOneWidget);
+    expect(find.text('65 / 110 g'), findsOneWidget);
+    expect(find.text('716 / 2200 kcal'), findsOneWidget);
+    expect(find.text('Needs confirmation'), findsOneWidget);
+
+    await _scrollUntilVisible(tester, find.text('Skyr bowl with berries'));
+
     expect(find.text('Skyr bowl with berries'), findsOneWidget);
     expect(find.text('6 min prep'), findsOneWidget);
     expect(find.text('All ingredients available'), findsOneWidget);
@@ -161,8 +174,19 @@ void main() {
       ),
     );
 
-    expect(find.text('No meal suggestion ready'), findsOneWidget);
     expect(find.text('No meals yet'), findsOneWidget);
+    expect(find.text('No sources yet'), findsOneWidget);
+    expect(find.text('0 / 110 g'), findsOneWidget);
+
+    await _scrollUntilVisible(tester, find.text('No meal suggestion ready'));
+
+    expect(find.text('No meal suggestion ready'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.textContaining('No meals logged yet today'),
+    );
+
     expect(find.textContaining('No meals logged yet today'), findsOneWidget);
 
     await _scrollUntilVisible(
@@ -176,8 +200,88 @@ void main() {
     );
   });
 
+  testWidgets('weight entry persists locally and updates trend display', (
+    tester,
+  ) async {
+    final repository = InMemoryNutritionRepository(
+      seedWeightEntries: [
+        WeightEntry(
+          id: 'yesterday',
+          recordedAt: DateTime(2026, 6, 28, 7),
+          weightKg: 82.4,
+          source: NutritionSeedData.userSource,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        TodayScreen(
+          profile: profile,
+          adapter: _FixtureAdapter([firstSuggestion]),
+          repository: repository,
+          now: DateTime(2026, 6, 29, 15, 30),
+        ),
+      ),
+    );
+
+    await _scrollUntilVisible(tester, find.text('Add weight'));
+    await tester.enterText(find.byType(TextField), '81.9');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+
+    expect(repository.weightEntries(), hasLength(2));
+    expect(find.textContaining('81.9 kg'), findsOneWidget);
+    expect(find.textContaining('Down 0.5 kg'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.text('Weight saved. Trend updated for today.'),
+    );
+
+    expect(find.text('Weight saved. Trend updated for today.'), findsOneWidget);
+  });
+
+  testWidgets('completed day state keeps guidance actionable', (tester) async {
+    final repository = InMemoryNutritionRepository(
+      seedMeals: [NutritionSeedData.meals.first],
+      seedGoal: const NutritionGoal(
+        proteinGrams: 20,
+        calories: 180,
+        carbsGrams: 20,
+        fatGrams: 1,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        TodayScreen(
+          profile: profile,
+          adapter: _FixtureAdapter([firstSuggestion]),
+          repository: repository,
+        ),
+      ),
+    );
+
+    expect(find.text('23 / 20 g'), findsWidgets);
+    expect(find.textContaining('Protein goal met'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.textContaining('Your protein target is covered'),
+    );
+
+    expect(
+      find.textContaining('Your protein target is covered'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('Today fits small and large mobile constraints', (tester) async {
     for (final size in const [Size(320, 720), Size(430, 932)]) {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
 
@@ -193,6 +297,9 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('What should I eat next?'), findsOneWidget);
+
+      await _scrollUntilVisible(tester, find.text('Skyr bowl with berries'));
+
       expect(find.text('Skyr bowl with berries'), findsOneWidget);
     }
 
