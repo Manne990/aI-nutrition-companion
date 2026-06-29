@@ -1,4 +1,6 @@
 import '../models/nutrition.dart';
+import '../services/nutrition_lookup_service.dart';
+import '../../services/adapters/nutrition_lookup_adapters.dart';
 
 abstract interface class NutritionRepository {
   List<FoodItem> foods();
@@ -13,6 +15,12 @@ abstract interface class NutritionRepository {
 
   DailySummary dailySummary(DateTime date);
 
+  Future<NutritionLookupResult> lookupFood(NutritionLookupQuery query);
+
+  Future<MealEnrichment> enrichMealItems(List<MealItem> items);
+
+  Future<MealEstimate> enrichMealEstimate(MealEstimate estimate);
+
   Meal saveMeal(Meal meal);
 
   WeightEntry saveWeightEntry(WeightEntry entry);
@@ -25,19 +33,32 @@ class InMemoryNutritionRepository implements NutritionRepository {
     List<WeightEntry>? seedWeightEntries,
     NutritionGoal? seedGoal,
     UserPreferences? seedPreferences,
+    NutritionEnrichmentService? lookupService,
   }) : _foods = List.of(seedFoods ?? NutritionSeedData.foods),
        _meals = List.of(seedMeals ?? NutritionSeedData.meals),
        _weightEntries = List.of(
          seedWeightEntries ?? NutritionSeedData.weightEntries,
        ),
        _goal = seedGoal ?? NutritionSeedData.goal,
-       _preferences = seedPreferences ?? NutritionSeedData.preferences;
+       _preferences = seedPreferences ?? NutritionSeedData.preferences,
+       _lookupService =
+           lookupService ??
+           NutritionEnrichmentService(
+             providers: const [
+               OpenFoodFactsNutritionProvider(),
+               FoodDataCentralNutritionProvider(apiKey: null),
+             ],
+             fallbackProvider: LocalNutritionLookupProvider(
+               foods: seedFoods ?? NutritionSeedData.foods,
+             ),
+           );
 
   final List<FoodItem> _foods;
   final List<Meal> _meals;
   final List<WeightEntry> _weightEntries;
   final NutritionGoal _goal;
   final UserPreferences _preferences;
+  final NutritionEnrichmentService _lookupService;
 
   @override
   List<FoodItem> foods() => List.unmodifiable(_foods);
@@ -62,6 +83,21 @@ class InMemoryNutritionRepository implements NutritionRepository {
       goal: _goal,
       weights: _weightEntries,
     );
+  }
+
+  @override
+  Future<NutritionLookupResult> lookupFood(NutritionLookupQuery query) {
+    return _lookupService.lookupFood(query);
+  }
+
+  @override
+  Future<MealEnrichment> enrichMealItems(List<MealItem> items) {
+    return _lookupService.enrichMealItems(items);
+  }
+
+  @override
+  Future<MealEstimate> enrichMealEstimate(MealEstimate estimate) {
+    return _lookupService.enrichMealEstimate(estimate);
   }
 
   @override
@@ -149,6 +185,30 @@ class NutritionSeedData {
       source: fallbackSource,
     ),
     FoodItem(
+      id: 'food-banana',
+      name: 'Banana',
+      servingDescription: '1 medium banana',
+      nutritionPerServing: MacroTotals(
+        calories: 105,
+        proteinGrams: 1.3,
+        carbsGrams: 27,
+        fatGrams: 0.4,
+      ),
+      source: fallbackSource,
+    ),
+    FoodItem(
+      id: 'food-rolled-oats',
+      name: 'Rolled oats',
+      servingDescription: '50 g dry oats',
+      nutritionPerServing: MacroTotals(
+        calories: 185,
+        proteinGrams: 6.5,
+        carbsGrams: 30,
+        fatGrams: 3.5,
+      ),
+      source: databaseSource,
+    ),
+    FoodItem(
       id: 'food-unknown-sauce',
       name: 'Unknown sauce',
       servingDescription: 'estimated spoonful',
@@ -190,7 +250,7 @@ class NutritionSeedData {
         ),
         MealItem(
           id: 'meal-lunch-sauce',
-          food: foods[3],
+          food: foods[5],
           servings: 1,
           source: aiSource,
         ),
