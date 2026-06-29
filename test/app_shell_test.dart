@@ -3,6 +3,7 @@ import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_chat_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/health_repository.dart';
+import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/onboarding_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,7 @@ OnboardingProfile _profile() {
 Future<void> _pumpApp(
   WidgetTester tester, {
   InMemoryOnboardingRepository? repository,
+  NutritionRepository? nutritionRepository,
 }) async {
   await tester.pumpWidget(
     AiNutritionCompanionApp(
@@ -31,6 +33,7 @@ Future<void> _pumpApp(
       aiSettingsRepository: InMemoryAiSettingsRepository(),
       healthRepository: InMemoryHealthRepository(),
       aiChatRepository: InMemoryAiChatRepository(),
+      nutritionRepository: nutritionRepository ?? InMemoryNutritionRepository(),
     ),
   );
   await tester.pumpAndSettle();
@@ -81,6 +84,24 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AI provider'), findsOneWidget);
+  });
+
+  testWidgets('Today and Kitchen share saved nutrition state', (tester) async {
+    final nutritionRepository = InMemoryNutritionRepository();
+
+    await _pumpApp(tester, nutritionRepository: nutritionRepository);
+
+    await _scrollUntilVisible(tester, find.text('Quick Log'));
+    await tester.tap(find.text('Log').first);
+    await tester.pumpAndSettle();
+
+    expect(nutritionRepository.meals().last.name, 'Banana snack');
+
+    await tester.tap(find.byIcon(Icons.restaurant_menu_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Favorite meals'), findsOneWidget);
+    expect(find.text('Banana snack'), findsOneWidget);
   });
 
   testWidgets('first-run user can skip optional steps and complete consent', (

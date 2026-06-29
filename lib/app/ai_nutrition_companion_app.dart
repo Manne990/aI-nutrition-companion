@@ -5,6 +5,7 @@ import 'theme/app_theme.dart';
 import '../domain/repositories/ai_chat_repository.dart';
 import '../domain/repositories/ai_settings_repository.dart';
 import '../domain/repositories/health_repository.dart';
+import '../domain/repositories/nutrition_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
 
 class AiNutritionCompanionApp extends StatefulWidget {
@@ -14,12 +15,14 @@ class AiNutritionCompanionApp extends StatefulWidget {
     this.aiSettingsRepository,
     this.healthRepository,
     this.aiChatRepository,
+    this.nutritionRepository,
   });
 
   final OnboardingRepository? onboardingRepository;
   final AiSettingsRepository? aiSettingsRepository;
   final HealthRepository? healthRepository;
   final AiChatRepository? aiChatRepository;
+  final NutritionRepository? nutritionRepository;
 
   @override
   State<AiNutritionCompanionApp> createState() =>
@@ -54,6 +57,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
       aiSettingsRepository: aiSettingsRepository,
       healthRepository: healthRepository,
       aiChatRepository: aiChatRepository,
+      nutritionRepository: widget.nutritionRepository,
     );
   }
 
@@ -73,6 +77,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
               aiSettingsRepository: repositories.aiSettingsRepository,
               healthRepository: repositories.healthRepository,
               aiChatRepository: repositories.aiChatRepository,
+              nutritionRepository: repositories.nutritionRepository,
             );
           }
           return const Scaffold(
@@ -90,10 +95,12 @@ class _AppRepositories {
     required this.aiSettingsRepository,
     required this.healthRepository,
     required this.aiChatRepository,
+    this.nutritionRepository,
   });
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
   final HealthRepository healthRepository;
   final AiChatRepository aiChatRepository;
+  final NutritionRepository? nutritionRepository;
 }
