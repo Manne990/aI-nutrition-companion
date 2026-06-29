@@ -328,6 +328,90 @@ class UserPreferences {
   final String coachingTone;
 }
 
+enum IngredientAvailability { available, runningLow, missing, unknown }
+
+class KitchenInventoryItem {
+  const KitchenInventoryItem({
+    required this.food,
+    required this.availability,
+    required this.note,
+    this.isFavorite = false,
+    this.lastLoggedAt,
+  });
+
+  final FoodItem food;
+  final IngredientAvailability availability;
+  final String note;
+  final bool isFavorite;
+  final DateTime? lastLoggedAt;
+}
+
+class KitchenFavoriteMeal {
+  const KitchenFavoriteMeal({
+    required this.name,
+    required this.timesLogged,
+    required this.lastLoggedAt,
+    required this.knownMacroTotals,
+    required this.itemNames,
+  });
+
+  final String name;
+  final int timesLogged;
+  final DateTime lastLoggedAt;
+  final MacroTotals knownMacroTotals;
+  final List<String> itemNames;
+}
+
+class QuickLogSuggestion {
+  const QuickLogSuggestion({
+    required this.id,
+    required this.title,
+    required this.mealName,
+    required this.food,
+    required this.servings,
+    required this.reason,
+    required this.availability,
+    required this.timeWindowLabel,
+    required this.source,
+  });
+
+  final String id;
+  final String title;
+  final String mealName;
+  final FoodItem food;
+  final double servings;
+  final String reason;
+  final IngredientAvailability availability;
+  final String timeWindowLabel;
+  final SourceMetadata source;
+
+  MacroTotals? get macroTotals => food.nutritionPerServing?.scale(servings);
+
+  Meal toMeal({required DateTime eatenAt}) {
+    final stamp = eatenAt.millisecondsSinceEpoch;
+    return Meal(
+      id: 'quick-log-$id-$stamp',
+      name: mealName,
+      eatenAt: eatenAt,
+      items: [
+        MealItem(
+          id: 'quick-log-item-$id-$stamp',
+          food: food,
+          servings: servings,
+          source: const SourceMetadata(
+            source: NutritionSource.userConfirmed,
+            label: 'Quick Log confirmed',
+          ),
+        ),
+      ],
+      source: const SourceMetadata(
+        source: NutritionSource.userConfirmed,
+        label: 'Quick Log confirmed meal',
+      ),
+    );
+  }
+}
+
 class DailySummary {
   const DailySummary({
     required this.date,
@@ -475,4 +559,206 @@ String normalizeFoodName(String value) {
       .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
+}
+
+List<KitchenInventoryItem> buildKitchenInventory({
+  required Iterable<FoodItem> foods,
+  required Iterable<Meal> meals,
+}) {
+  final lastLoggedByFood = <String, DateTime>{};
+  for (final meal in meals) {
+    for (final item in meal.items) {
+      final previous = lastLoggedByFood[item.food.id];
+      if (previous == null || meal.eatenAt.isAfter(previous)) {
+        lastLoggedByFood[item.food.id] = meal.eatenAt;
+      }
+    }
+  }
+
+  return foods
+      .map(
+        (food) => KitchenInventoryItem(
+          food: food,
+          availability: _availabilityForFood(food),
+          note: _availabilityNote(food),
+          isFavorite:
+              lastLoggedByFood.containsKey(food.id) ||
+              food.source.source == NutritionSource.databaseVerified,
+          lastLoggedAt: lastLoggedByFood[food.id],
+        ),
+      )
+      .toList(growable: false);
+}
+
+List<KitchenFavoriteMeal> buildFavoriteMeals(Iterable<Meal> meals) {
+  final grouped = <String, List<Meal>>{};
+  for (final meal in meals) {
+    grouped.putIfAbsent(meal.name, () => []).add(meal);
+  }
+
+  final favorites = grouped.entries.map((entry) {
+    final sorted = List<Meal>.of(entry.value)
+      ..sort((a, b) => b.eatenAt.compareTo(a.eatenAt));
+    final latest = sorted.first;
+    return KitchenFavoriteMeal(
+      name: entry.key,
+      timesLogged: sorted.length,
+      lastLoggedAt: latest.eatenAt,
+      knownMacroTotals: latest.knownMacroTotals,
+      itemNames: latest.items.map((item) => item.food.name).toList(),
+    );
+  }).toList()..sort((a, b) => b.lastLoggedAt.compareTo(a.lastLoggedAt));
+
+  return favorites;
+}
+
+List<QuickLogSuggestion> buildQuickLogSuggestions({
+  required DateTime now,
+  required Iterable<FoodItem> foods,
+  required Iterable<Meal> meals,
+}) {
+  final foodById = {for (final food in foods) food.id: food};
+  final window = _timeWindow(now);
+  final suggestions = <QuickLogSuggestion>[];
+
+  final matchingHistory =
+      meals.where((meal) => _timeWindow(meal.eatenAt) == window).toList()
+        ..sort((a, b) => b.eatenAt.compareTo(a.eatenAt));
+
+  for (final meal in matchingHistory) {
+    for (final item in meal.items) {
+      _addSuggestion(
+        suggestions,
+        food: item.food,
+        mealName: meal.name,
+        servings: item.servings,
+        reason: 'Usually logged around ${_windowLabel(window).toLowerCase()}',
+        window: window,
+      );
+    }
+  }
+
+  for (final foodId in _defaultFoodIdsForWindow(window)) {
+    final food = foodById[foodId];
+    if (food == null) {
+      continue;
+    }
+    _addSuggestion(
+      suggestions,
+      food: food,
+      mealName: _defaultMealName(food),
+      servings: 1,
+      reason: _defaultReasonForWindow(window),
+      window: window,
+    );
+  }
+
+  return suggestions.take(3).toList(growable: false);
+}
+
+void _addSuggestion(
+  List<QuickLogSuggestion> suggestions, {
+  required FoodItem food,
+  required String mealName,
+  required double servings,
+  required String reason,
+  required _MealTimeWindow window,
+}) {
+  if (suggestions.any((suggestion) => suggestion.food.id == food.id)) {
+    return;
+  }
+  suggestions.add(
+    QuickLogSuggestion(
+      id: food.id,
+      title: food.name,
+      mealName: mealName,
+      food: food,
+      servings: servings,
+      reason: reason,
+      availability: _availabilityForFood(food),
+      timeWindowLabel: _windowLabel(window),
+      source: const SourceMetadata(
+        source: NutritionSource.fallback,
+        label: 'Habit suggestion',
+        provider: 'local-history',
+      ),
+    ),
+  );
+}
+
+enum _MealTimeWindow { morning, midday, afternoon, evening, late }
+
+_MealTimeWindow _timeWindow(DateTime time) {
+  final hour = time.hour;
+  if (hour >= 5 && hour < 11) {
+    return _MealTimeWindow.morning;
+  }
+  if (hour >= 11 && hour < 15) {
+    return _MealTimeWindow.midday;
+  }
+  if (hour >= 15 && hour < 18) {
+    return _MealTimeWindow.afternoon;
+  }
+  if (hour >= 18 && hour < 22) {
+    return _MealTimeWindow.evening;
+  }
+  return _MealTimeWindow.late;
+}
+
+List<String> _defaultFoodIdsForWindow(_MealTimeWindow window) {
+  return switch (window) {
+    _MealTimeWindow.morning => ['food-skyr', 'food-rolled-oats'],
+    _MealTimeWindow.midday => ['food-chicken-salad', 'food-banana'],
+    _MealTimeWindow.afternoon => ['food-banana', 'food-skyr'],
+    _MealTimeWindow.evening => ['food-chicken-salad', 'food-rolled-oats'],
+    _MealTimeWindow.late => ['food-skyr', 'food-banana'],
+  };
+}
+
+String _windowLabel(_MealTimeWindow window) {
+  return switch (window) {
+    _MealTimeWindow.morning => 'Morning',
+    _MealTimeWindow.midday => 'Midday',
+    _MealTimeWindow.afternoon => 'Afternoon',
+    _MealTimeWindow.evening => 'Evening',
+    _MealTimeWindow.late => 'Late',
+  };
+}
+
+String _defaultReasonForWindow(_MealTimeWindow window) {
+  return switch (window) {
+    _MealTimeWindow.morning => 'Fits a common high-protein morning',
+    _MealTimeWindow.midday => 'Fits the usual lunch window',
+    _MealTimeWindow.afternoon => 'Good for a light afternoon snack',
+    _MealTimeWindow.evening => 'Keeps dinner simple from familiar foods',
+    _MealTimeWindow.late => 'Light option for a late check-in',
+  };
+}
+
+String _defaultMealName(FoodItem food) {
+  return switch (food.id) {
+    'food-skyr' => 'Skyr bowl',
+    'food-chicken-salad' => 'Chicken salad',
+    'food-banana' => 'Banana snack',
+    'food-rolled-oats' => 'Oats bowl',
+    _ => food.name,
+  };
+}
+
+IngredientAvailability _availabilityForFood(FoodItem food) {
+  return switch (food.source.source) {
+    NutritionSource.databaseVerified => IngredientAvailability.available,
+    NutritionSource.userConfirmed => IngredientAvailability.available,
+    NutritionSource.fallback => IngredientAvailability.runningLow,
+    NutritionSource.aiEstimated => IngredientAvailability.unknown,
+  };
+}
+
+String _availabilityNote(FoodItem food) {
+  return switch (_availabilityForFood(food)) {
+    IngredientAvailability.available => 'Available in kitchen',
+    IngredientAvailability.runningLow => 'Check quantity before relying on it',
+    IngredientAvailability.missing => 'Not currently available',
+    IngredientAvailability.unknown => 'Availability not confirmed yet',
+  };
 }
