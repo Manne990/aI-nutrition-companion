@@ -17,6 +17,9 @@ void main() {
       expect(summary.itemsWithMissingNutrition, 1);
       expect(summary.hasMissingNutrition, isTrue);
       expect(summary.proteinRemainingGrams, closeTo(45.4, 0.001));
+      expect(summary.calorieRemaining, 1484);
+      expect(summary.proteinProgress, closeTo(0.587, 0.001));
+      expect(summary.calorieProgress, closeTo(0.325, 0.001));
       expect(summary.latestWeightEntry?.weightKg, 82.4);
     });
 
@@ -42,6 +45,48 @@ void main() {
       final summary = repository.dailySummary(DateTime(2026, 6, 30));
 
       expect(summary.meals.map((meal) => meal.id), ['morning', 'evening']);
+    });
+
+    test('reports weight trend from the latest two available entries', () {
+      final repository = InMemoryNutritionRepository(
+        seedWeightEntries: [
+          WeightEntry(
+            id: 'yesterday',
+            recordedAt: DateTime(2026, 6, 28, 7),
+            weightKg: 82.9,
+            source: NutritionSeedData.userSource,
+          ),
+          WeightEntry(
+            id: 'today',
+            recordedAt: DateTime(2026, 6, 29, 7),
+            weightKg: 82.4,
+            source: NutritionSeedData.userSource,
+          ),
+        ],
+      );
+
+      final summary = repository.dailySummary(DateTime(2026, 6, 29, 18));
+
+      expect(summary.latestWeightEntry?.id, 'today');
+      expect(summary.previousWeightEntry?.id, 'yesterday');
+      expect(summary.weightDeltaKg, closeTo(-0.5, 0.001));
+    });
+
+    test('caps completed-day progress at one', () {
+      final repository = InMemoryNutritionRepository(
+        seedGoal: const NutritionGoal(
+          proteinGrams: 30,
+          calories: 500,
+          carbsGrams: 40,
+          fatGrams: 15,
+        ),
+      );
+
+      final summary = repository.dailySummary(DateTime(2026, 6, 29));
+
+      expect(summary.proteinRemainingGrams, 0);
+      expect(summary.proteinProgress, 1);
+      expect(summary.calorieProgress, 1);
     });
   });
 

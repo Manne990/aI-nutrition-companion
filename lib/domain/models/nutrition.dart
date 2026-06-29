@@ -336,6 +336,7 @@ class DailySummary {
     required this.itemsWithMissingNutrition,
     this.goal,
     this.latestWeightEntry,
+    this.previousWeightEntry,
   });
 
   final DateTime date;
@@ -344,6 +345,7 @@ class DailySummary {
   final int itemsWithMissingNutrition;
   final NutritionGoal? goal;
   final WeightEntry? latestWeightEntry;
+  final WeightEntry? previousWeightEntry;
 
   double? get proteinRemainingGrams {
     final goal = this.goal;
@@ -354,7 +356,59 @@ class DailySummary {
     return remaining <= 0 ? 0 : remaining;
   }
 
+  double? get calorieRemaining {
+    final calories = goal?.calories;
+    if (calories == null) {
+      return null;
+    }
+    final remaining = calories - knownMacroTotals.calories;
+    return remaining <= 0 ? 0 : remaining;
+  }
+
+  double? get proteinProgress {
+    final goal = this.goal;
+    if (goal == null || goal.proteinGrams <= 0) {
+      return null;
+    }
+    return _progress(knownMacroTotals.proteinGrams, goal.proteinGrams);
+  }
+
+  double? get calorieProgress {
+    final calories = goal?.calories;
+    if (calories == null || calories <= 0) {
+      return null;
+    }
+    return _progress(knownMacroTotals.calories, calories);
+  }
+
+  double? get carbsProgress {
+    final carbs = goal?.carbsGrams;
+    if (carbs == null || carbs <= 0) {
+      return null;
+    }
+    return _progress(knownMacroTotals.carbsGrams, carbs);
+  }
+
+  double? get fatProgress {
+    final fat = goal?.fatGrams;
+    if (fat == null || fat <= 0) {
+      return null;
+    }
+    return _progress(knownMacroTotals.fatGrams, fat);
+  }
+
+  double? get weightDeltaKg {
+    final latest = latestWeightEntry;
+    final previous = previousWeightEntry;
+    if (latest == null || previous == null) {
+      return null;
+    }
+    return latest.weightKg - previous.weightKg;
+  }
+
   bool get hasMissingNutrition => itemsWithMissingNutrition > 0;
+
+  bool get hasMeals => meals.isNotEmpty;
 }
 
 MacroTotals sumKnownMacros(Iterable<MealItem> items) {
@@ -379,6 +433,8 @@ DailySummary buildDailySummary({
           .where((entry) => !entry.recordedAt.isAfter(_endOfDay(date)))
           .toList()
         ..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
+  final latestWeight = dayWeights.firstOrNull;
+  final previousWeight = dayWeights.skip(1).firstOrNull;
 
   return DailySummary(
     date: DateTime(date.year, date.month, date.day),
@@ -388,8 +444,20 @@ DailySummary buildDailySummary({
         .where((item) => !item.hasKnownNutrition)
         .length,
     goal: goal,
-    latestWeightEntry: dayWeights.firstOrNull,
+    latestWeightEntry: latestWeight,
+    previousWeightEntry: previousWeight,
   );
+}
+
+double _progress(double value, double target) {
+  final progress = value / target;
+  if (progress < 0) {
+    return 0;
+  }
+  if (progress > 1) {
+    return 1;
+  }
+  return progress;
 }
 
 bool _isSameDay(DateTime a, DateTime b) {

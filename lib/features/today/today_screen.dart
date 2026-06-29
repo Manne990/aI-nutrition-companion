@@ -42,6 +42,7 @@ class TodayScreen extends StatefulWidget {
 class _TodayScreenState extends State<TodayScreen> {
   late List<MealSuggestion> _suggestions;
   late NutritionRepository _repository;
+  final TextEditingController _weightController = TextEditingController();
   int _selectedSuggestionIndex = 0;
   _SuggestionAction _lastAction = _SuggestionAction.none;
   String? _aiChoiceMessage;
@@ -51,6 +52,12 @@ class _TodayScreenState extends State<TodayScreen> {
     super.initState();
     _repository = _createRepository();
     _suggestions = _loadSuggestions();
+  }
+
+  @override
+  void dispose() {
+    _weightController.dispose();
+    super.dispose();
   }
 
   @override
@@ -122,6 +129,12 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         const SizedBox(height: AppSpacing.lg),
         _TodayRhythmCard(now: now, summary: summary),
+        const SizedBox(height: AppSpacing.md),
+        _DailyNutritionOverviewCard(
+          summary: summary,
+          weightController: _weightController,
+          onSaveWeight: _saveWeightEntry,
+        ),
         const SizedBox(height: AppSpacing.md),
         if (suggestion == null)
           const _EmptySuggestionCard()
@@ -231,6 +244,31 @@ class _TodayScreenState extends State<TodayScreen> {
     setState(() {
       _lastAction = _SuggestionAction.deferred;
       _aiChoiceMessage = null;
+    });
+  }
+
+  void _saveWeightEntry() {
+    final normalized = _weightController.text.trim().replaceAll(',', '.');
+    final weightKg = double.tryParse(normalized);
+    if (weightKg == null || weightKg <= 0) {
+      setState(() {
+        _aiChoiceMessage = 'Enter a valid weight in kg.';
+      });
+      return;
+    }
+
+    final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
+    _repository.saveWeightEntry(
+      WeightEntry(
+        id: 'weight-${now.millisecondsSinceEpoch}',
+        recordedAt: now,
+        weightKg: weightKg,
+        source: NutritionSeedData.userSource,
+      ),
+    );
+    setState(() {
+      _weightController.clear();
+      _aiChoiceMessage = 'Weight saved. Trend updated for today.';
     });
   }
 }
@@ -379,6 +417,292 @@ class _TodayRhythmCard extends StatelessWidget {
   }
 }
 
+class _DailyNutritionOverviewCard extends StatelessWidget {
+  const _DailyNutritionOverviewCard({
+    required this.summary,
+    required this.weightController,
+    required this.onSaveWeight,
+  });
+
+  final DailySummary summary;
+  final TextEditingController weightController;
+  final VoidCallback onSaveWeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionCard(
+      title: 'Daily overview',
+      eyebrow: 'Progress today',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppChip(
+                label: _sourceStateLabel(summary),
+                icon: Icons.verified_outlined,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _ProteinProgress(summary: summary),
+          const SizedBox(height: AppSpacing.md),
+          AppMetricRow(
+            metrics: [
+              AppMetricData(
+                label: 'Calories',
+                value: _macroGoalLabel(
+                  summary.knownMacroTotals.calories,
+                  summary.goal?.calories,
+                  'kcal',
+                ),
+              ),
+              AppMetricData(
+                label: 'Carbs',
+                value: _macroGoalLabel(
+                  summary.knownMacroTotals.carbsGrams,
+                  summary.goal?.carbsGrams,
+                  'g',
+                ),
+              ),
+              AppMetricData(
+                label: 'Fat',
+                value: _macroGoalLabel(
+                  summary.knownMacroTotals.fatGrams,
+                  summary.goal?.fatGrams,
+                  'g',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _DecisionSupport(summary: summary),
+          const SizedBox(height: AppSpacing.md),
+          _MealHistory(summary: summary),
+          const SizedBox(height: AppSpacing.md),
+          _WeightTracker(
+            controller: weightController,
+            summary: summary,
+            onSave: onSaveWeight,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProteinProgress extends StatelessWidget {
+  const _ProteinProgress({required this.summary});
+
+  final DailySummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = summary.proteinProgress ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Text(
+                'Protein',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            Text(
+              _macroGoalLabel(
+                summary.knownMacroTotals.proteinGrams,
+                summary.goal?.proteinGrams,
+                'g',
+              ),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        LinearProgressIndicator(
+          value: progress,
+          minHeight: 10,
+          borderRadius: BorderRadius.circular(AppRadii.pill),
+          backgroundColor: AppColors.oat,
+          color: progress >= 1 ? AppColors.leafGreen : AppColors.peachInk,
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          _proteinProgressCopy(summary),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
+        ),
+      ],
+    );
+  }
+}
+
+class _DecisionSupport extends StatelessWidget {
+  const _DecisionSupport({required this.summary});
+
+  final DailySummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softIvory,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.insights_outlined, color: AppColors.deepGreen),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                _nextStepInsight(summary),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MealHistory extends StatelessWidget {
+  const _MealHistory({required this.summary});
+
+  final DailySummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    if (summary.meals.isEmpty) {
+      return const Text(
+        'Meal history is empty for today. Log a meal to turn the overview into live decision support.',
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Meal history', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        for (final meal in summary.meals) ...[
+          _MealHistoryRow(meal: meal),
+          if (meal != summary.meals.last) const Divider(height: AppSpacing.lg),
+        ],
+      ],
+    );
+  }
+}
+
+class _MealHistoryRow extends StatelessWidget {
+  const _MealHistoryRow({required this.meal});
+
+  final Meal meal;
+
+  @override
+  Widget build(BuildContext context) {
+    final macros = meal.knownMacroTotals;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 48,
+          child: Text(
+            _formatTime(meal.eatenAt),
+            style: const TextStyle(color: AppColors.mutedInk, fontSize: 12),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(meal.name, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                '${macros.calories.round()} kcal | ${macros.proteinGrams.round()}g protein',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
+              ),
+              if (meal.hasMissingNutrition) ...[
+                const SizedBox(height: AppSpacing.xxs),
+                const Text(
+                  'Includes an item that still needs confirmation.',
+                  style: TextStyle(color: AppColors.mutedInk, fontSize: 12),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeightTracker extends StatelessWidget {
+  const _WeightTracker({
+    required this.controller,
+    required this.summary,
+    required this.onSave,
+  });
+
+  final TextEditingController controller;
+  final DailySummary summary;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = summary.latestWeightEntry;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Weight trend', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          latest == null
+              ? 'No weight entry yet.'
+              : '${latest.weightKg.toStringAsFixed(1)} kg | ${_weightTrendLabel(summary)}',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Add weight',
+                  suffixText: 'kg',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            FilledButton.icon(
+              onPressed: onSave,
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Save'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _EmptySuggestionCard extends StatelessWidget {
   const _EmptySuggestionCard();
 
@@ -424,6 +748,75 @@ String _aiInsight(DailySummary summary, MealSuggestion? suggestion) {
     return '${suggestion.title} fits your current rhythm and keeps the next step simple.';
   }
   return 'You are about ${remaining.round()}g short of protein today. ${suggestion.title} helps without making dinner feel locked in.';
+}
+
+String _sourceStateLabel(DailySummary summary) {
+  if (summary.meals.isEmpty) {
+    return 'No sources yet';
+  }
+  if (summary.hasMissingNutrition) {
+    return 'Needs confirmation';
+  }
+  final hasEstimates = summary.meals
+      .expand((meal) => meal.items)
+      .any(
+        (item) =>
+            item.source.source == NutritionSource.aiEstimated ||
+            item.source.source == NutritionSource.fallback ||
+            item.food.source.source == NutritionSource.aiEstimated ||
+            item.food.source.source == NutritionSource.fallback,
+      );
+  return hasEstimates ? 'Mixed sources' : 'Confirmed data';
+}
+
+String _macroGoalLabel(double current, double? goal, String unit) {
+  final currentLabel = current.round();
+  if (goal == null) {
+    return '$currentLabel $unit';
+  }
+  return '$currentLabel / ${goal.round()} $unit';
+}
+
+String _proteinProgressCopy(DailySummary summary) {
+  final remaining = summary.proteinRemainingGrams;
+  if (remaining == null) {
+    return 'Set a protein goal to make this progress actionable.';
+  }
+  if (remaining == 0) {
+    return 'Protein goal met. Keep the next meal comfortable and balanced.';
+  }
+  return '${remaining.round()}g protein left. Prioritize a simple protein anchor next.';
+}
+
+String _nextStepInsight(DailySummary summary) {
+  if (summary.meals.isEmpty) {
+    return 'Start with any easy meal or photo log so the companion has a real baseline for the day.';
+  }
+  if (summary.hasMissingNutrition) {
+    return 'Confirm the estimated item when you can; the protein signal is useful, but the calorie total may move.';
+  }
+  if (summary.proteinRemainingGrams == 0) {
+    return 'Your protein target is covered. Choose the next meal for energy, comfort, and consistency.';
+  }
+  return 'Use the next eating moment to close the protein gap without forcing a full meal.';
+}
+
+String _weightTrendLabel(DailySummary summary) {
+  final delta = summary.weightDeltaKg;
+  if (delta == null) {
+    return 'First local entry';
+  }
+  if (delta == 0) {
+    return 'No change';
+  }
+  final direction = delta > 0 ? 'Up' : 'Down';
+  return '$direction ${delta.abs().toStringAsFixed(1)} kg';
+}
+
+String _formatTime(DateTime date) {
+  final hour = date.hour.toString().padLeft(2, '0');
+  final minute = date.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
 }
 
 String _currentMoment(DateTime now) {

@@ -30,6 +30,21 @@ Future<void> _pumpApp(
   await tester.pumpAndSettle();
 }
 
+Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
+  final scrollable = find.byType(ListView);
+  for (var attempt = 0; attempt < 12; attempt += 1) {
+    await tester.pump();
+    if (finder.evaluate().isNotEmpty) {
+      await tester.ensureVisible(finder);
+      await tester.pumpAndSettle();
+      return;
+    }
+    await tester.drag(scrollable, const Offset(0, -260));
+    await tester.pumpAndSettle();
+  }
+  expect(finder, findsOneWidget);
+}
+
 void main() {
   testWidgets('returning user sees Today and bottom navigation', (
     tester,
@@ -37,11 +52,15 @@ void main() {
     await _pumpApp(tester);
 
     expect(find.text('What should I eat next?'), findsOneWidget);
-    expect(find.text('Skyr bowl with berries'), findsOneWidget);
+    expect(find.text('Daily overview'), findsOneWidget);
     expect(find.text('110g protein goal'), findsOneWidget);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Kitchen'), findsOneWidget);
     expect(find.text('Me'), findsOneWidget);
+
+    await _scrollUntilVisible(tester, find.text('Skyr bowl with berries'));
+
+    expect(find.text('Skyr bowl with berries'), findsOneWidget);
   });
 
   testWidgets('bottom navigation switches between V1 sections', (tester) async {
