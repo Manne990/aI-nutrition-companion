@@ -1,7 +1,9 @@
 import 'package:ai_nutrition_companion/app/theme/app_theme.dart';
 import 'package:ai_nutrition_companion/domain/models/ai_settings.dart';
+import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
+import 'package:ai_nutrition_companion/domain/repositories/health_repository.dart';
 import 'package:ai_nutrition_companion/features/me/me_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,14 +30,21 @@ Widget _wrap(Widget child) {
 
 Future<void> _pumpMe(
   WidgetTester tester,
-  InMemoryAiSettingsRepository repository,
-) async {
+  InMemoryAiSettingsRepository aiRepository, {
+  InMemoryHealthRepository? healthRepository,
+  HealthConnectionState healthState = HealthConnectionState.disconnected,
+}) async {
+  final effectiveHealthRepository =
+      healthRepository ?? InMemoryHealthRepository(initialState: healthState);
   await tester.pumpWidget(
     _wrap(
       MeScreen(
         profile: _profile(),
-        aiSettingsRepository: repository,
+        aiSettingsRepository: aiRepository,
+        healthRepository: effectiveHealthRepository,
+        healthState: healthState,
         onAiSettingsChanged: () async {},
+        onHealthStateChanged: () async {},
         onResetOnboarding: () async {},
       ),
     ),
@@ -134,5 +143,77 @@ void main() {
     expect((await repository.loadTokenState()).hasToken, isFalse);
     expect(find.text('No token saved'), findsOneWidget);
     expect(find.text('Token deleted from this device.'), findsOneWidget);
+  });
+
+  testWidgets('health connection starts disconnected until user intent', (
+    tester,
+  ) async {
+    final aiRepository = InMemoryAiSettingsRepository();
+
+    await _pumpMe(tester, aiRepository);
+    await _scrollUntilVisible(tester, find.text('Health connection'));
+
+    expect(find.text('Disconnected'), findsOneWidget);
+    expect(find.textContaining('until you choose Connect'), findsOneWidget);
+    expect(find.text('Connect health'), findsOneWidget);
+  });
+
+  testWidgets('user can connect and disconnect mock health signals', (
+    tester,
+  ) async {
+    final aiRepository = InMemoryAiSettingsRepository();
+    final healthRepository = InMemoryHealthRepository();
+
+    await _pumpMe(tester, aiRepository, healthRepository: healthRepository);
+    await _scrollUntilVisible(tester, find.text('Connect health'));
+    await tester.tap(find.text('Connect health'));
+    await tester.pumpAndSettle();
+
+    expect(
+      (await healthRepository.loadState()).status,
+      HealthConnectionStatus.connected,
+    );
+    expect(find.text('Connected'), findsOneWidget);
+    expect(find.text('6.8h sleep'), findsOneWidget);
+    expect(find.text('Disconnect health'), findsOneWidget);
+
+    await tester.tap(find.text('Disconnect health'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Disconnected'), findsOneWidget);
+    expect(find.text('Health connection disconnected.'), findsOneWidget);
+  });
+
+  testWidgets('health denied and unavailable states are visible', (
+    tester,
+  ) async {
+    final aiRepository = InMemoryAiSettingsRepository();
+    final deniedState = const HealthConnectionState(
+      status: HealthConnectionStatus.denied,
+      supportedTypes: HealthConnectionState.mvpTypes,
+      enabledTypes: {},
+      statusDetail: 'Permission was previously denied.',
+    );
+
+    await _pumpMe(tester, aiRepository, healthState: deniedState);
+    await _scrollUntilVisible(tester, find.text('Permission denied'));
+
+    expect(find.textContaining('change permission'), findsOneWidget);
+
+    final unavailableState = const HealthConnectionState(
+      status: HealthConnectionStatus.unavailable,
+      supportedTypes: {},
+      enabledTypes: {},
+      statusDetail: 'No HealthKit or Health Connect bridge is configured.',
+    );
+
+    await _pumpMe(tester, aiRepository, healthState: unavailableState);
+    await _scrollUntilVisible(tester, find.text('Unavailable'));
+
+    expect(find.textContaining('not available in this build'), findsOneWidget);
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Connect health'),
+    );
+    expect(button.onPressed, isNull);
   });
 }

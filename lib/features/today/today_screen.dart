@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../domain/models/health.dart';
 import '../../domain/models/meal_suggestion.dart';
 import '../../domain/models/nutrition.dart';
 import '../../domain/models/onboarding.dart';
@@ -25,6 +26,7 @@ class TodayScreen extends StatefulWidget {
     this.repository,
     this.photoMealSource,
     this.mealRecognitionAdapter = const MockMealRecognitionAdapter(),
+    this.healthSignals,
     this.now,
   });
 
@@ -33,6 +35,7 @@ class TodayScreen extends StatefulWidget {
   final NutritionRepository? repository;
   final PhotoMealSource? photoMealSource;
   final MealRecognitionAdapter mealRecognitionAdapter;
+  final HealthSignalSnapshot? healthSignals;
   final DateTime? now;
 
   @override
@@ -64,7 +67,8 @@ class _TodayScreenState extends State<TodayScreen> {
   void didUpdateWidget(covariant TodayScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.adapter != widget.adapter ||
-        oldWidget.profile != widget.profile) {
+        oldWidget.profile != widget.profile ||
+        oldWidget.healthSignals != widget.healthSignals) {
       _suggestions = _loadSuggestions();
       _selectedSuggestionIndex = 0;
       _lastAction = _SuggestionAction.none;
@@ -87,6 +91,7 @@ class _TodayScreenState extends State<TodayScreen> {
   List<MealSuggestion> _loadSuggestions() {
     return widget.adapter.mealSuggestions(
       preferences: widget.profile.toUserPreferences(),
+      healthSignals: widget.healthSignals,
     );
   }
 

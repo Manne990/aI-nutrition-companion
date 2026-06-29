@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_shell.dart';
 import 'theme/app_theme.dart';
 import '../domain/repositories/ai_settings_repository.dart';
+import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
 
 class AiNutritionCompanionApp extends StatefulWidget {
@@ -10,10 +11,12 @@ class AiNutritionCompanionApp extends StatefulWidget {
     super.key,
     this.onboardingRepository,
     this.aiSettingsRepository,
+    this.healthRepository,
   });
 
   final OnboardingRepository? onboardingRepository;
   final AiSettingsRepository? aiSettingsRepository;
+  final HealthRepository? healthRepository;
 
   @override
   State<AiNutritionCompanionApp> createState() =>
@@ -36,10 +39,14 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
     final aiSettingsRepository = widget.aiSettingsRepository == null
         ? await SharedPreferencesAiSettingsRepository.create()
         : widget.aiSettingsRepository!;
+    final healthRepository = widget.healthRepository == null
+        ? await SharedPreferencesHealthRepository.create()
+        : widget.healthRepository!;
 
     return _AppRepositories(
       onboardingRepository: onboardingRepository,
       aiSettingsRepository: aiSettingsRepository,
+      healthRepository: healthRepository,
     );
   }
 
@@ -57,6 +64,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
             return AppShell(
               onboardingRepository: repositories.onboardingRepository,
               aiSettingsRepository: repositories.aiSettingsRepository,
+              healthRepository: repositories.healthRepository,
             );
           }
           return const Scaffold(
@@ -72,8 +80,10 @@ class _AppRepositories {
   const _AppRepositories({
     required this.onboardingRepository,
     required this.aiSettingsRepository,
+    required this.healthRepository,
   });
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
+  final HealthRepository healthRepository;
 }

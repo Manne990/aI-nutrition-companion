@@ -42,7 +42,9 @@ Current app facts from this repository:
 - No backend exists yet.
 - User-provided AI token storage is scaffolded through
   `docs/ai-provider-settings.md` and platform secure storage.
-- No HealthKit or Health Connect integration exists yet.
+- Health connection scaffolding exists behind a mock provider. No HealthKit
+  entitlement, Android Health Connect permission, or native bridge is enabled
+  yet. See `docs/health-data-scaffolding.md`.
 - Local CI is `bash scripts/local_ci.sh`.
 
 ## Must Fix Before Store Submission
@@ -87,7 +89,7 @@ categories for V1 review:
 | Meal history and nutrition estimates | Local logging and future AI/nutrition adapters | Treat as user content or health/fitness-adjacent data depending on final storage and transmission. |
 | Goals and preferences | Onboarding and Me settings | Declare if collected, transmitted, or linked to the user. |
 | Weight entries | Future #8 work | Treat as sensitive health/fitness data if stored or transmitted. |
-| Health signals | Future #11 work | Declare only after actual HealthKit/Health Connect behavior exists. |
+| Health signals | Mock #11 scaffolding only | Declare health data only after actual HealthKit/Health Connect behavior exists beyond the local mock provider. |
 | Chat prompts and responses | Future #9 work | Declare if sent to a provider or stored beyond local session needs. |
 | User-provided AI token state | Future #13 work | Do not expose the token. Declare any token-related collection or diagnostics only if transmitted or linked. |
 | Diagnostics and crash data | Not currently configured | Declare if a crash or analytics SDK is added. |
@@ -246,6 +248,10 @@ signals such as weight, activity, workouts, or sleep to personalize suggestions.
 You can disconnect it later.
 ```
 
+Current V1 scaffolding uses a deterministic mock provider only. It does not add
+HealthKit entitlements, Android Health Connect permissions, or native health
+plugin access.
+
 If health integration is unavailable:
 
 ```text
@@ -340,8 +346,8 @@ Run the matrix before public testing or production submission.
 | Mock AI | Default mode | Default mode | Chat and recognition mocks remain deterministic for tests. |
 | Real AI token missing | Future #13 | Future #13 | Real provider mode routes to token/settings guidance. |
 | Token create/update/delete | Future #13 | Future #13 | Token state changes locally and deletion is clear. |
-| Health disconnected | Future #11 | Future #11 | App works without health access. |
-| Health denied/unavailable | Future #11 | Future #11 | App explains state and keeps manual flow available. |
+| Health disconnected | Me tab mock scaffold | Me tab mock scaffold | App works without health access. |
+| Health denied/unavailable | Mocked provider states | Mocked provider states | App explains state and keeps manual flow available. |
 | Data reset/deletion | Future settings | Future settings | User can reset supported local data and understands limits. |
 
 ## Submission Readiness Checklist

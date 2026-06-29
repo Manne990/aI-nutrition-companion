@@ -1,4 +1,5 @@
 import 'package:ai_nutrition_companion/app/theme/app_theme.dart';
+import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/meal_suggestion.dart';
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
@@ -36,7 +37,10 @@ class _FixtureAdapter implements NutritionCompanionAdapter {
   final List<MealSuggestion> suggestions;
 
   @override
-  List<MealSuggestion> mealSuggestions({UserPreferences? preferences}) {
+  List<MealSuggestion> mealSuggestions({
+    UserPreferences? preferences,
+    HealthSignalSnapshot? healthSignals,
+  }) {
     return suggestions;
   }
 }
