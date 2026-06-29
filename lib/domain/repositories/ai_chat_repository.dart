@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/ai_chat.dart';
+import 'persisted_json.dart';
 
 abstract interface class AiChatRepository {
   Future<List<AiChatMessage>> loadMessages();
@@ -33,14 +34,15 @@ class SharedPreferencesAiChatRepository implements AiChatRepository {
       return const [];
     }
 
-    final decoded = jsonDecode(rawMessages);
-    if (decoded is! List) {
+    final decoded = decodePersistedJsonList(rawMessages);
+    if (decoded == null) {
       return const [];
     }
 
     return decoded
         .whereType<Map>()
-        .map((item) => AiChatMessage.fromJson(Map<String, Object?>.from(item)))
+        .map(_messageFromStoredJson)
+        .whereType<AiChatMessage>()
         .where((message) => message.content.trim().isNotEmpty)
         .toList(growable: false);
   }
@@ -62,6 +64,14 @@ class SharedPreferencesAiChatRepository implements AiChatRepository {
   @override
   Future<void> clearMessages() async {
     await _preferences.remove(messagesKey);
+  }
+
+  AiChatMessage? _messageFromStoredJson(Map<Object?, Object?> item) {
+    try {
+      return AiChatMessage.fromJson(Map<String, Object?>.from(item));
+    } on TypeError {
+      return null;
+    }
   }
 }
 

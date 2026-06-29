@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/health.dart';
+import 'persisted_json.dart';
 
 abstract interface class HealthRepository {
   Future<HealthConnectionState> loadState();
@@ -265,11 +266,11 @@ class SharedPreferencesHealthRepository implements HealthRepository {
     if (rawSignals == null || rawSignals.isEmpty) {
       return null;
     }
-    final decoded = jsonDecode(rawSignals);
-    if (decoded is! Map) {
+    final decoded = decodePersistedJsonMap(rawSignals);
+    if (decoded == null) {
       return null;
     }
-    return HealthSignalSnapshot.fromJson(Map<String, Object?>.from(decoded));
+    return HealthSignalSnapshot.fromJson(decoded);
   }
 
   Future<HealthConnectionState> _persistedUnavailable(

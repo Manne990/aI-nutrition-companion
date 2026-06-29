@@ -77,4 +77,28 @@ void main() {
       expect(await repository.loadProfile(), isNull);
     },
   );
+
+  test(
+    'shared preferences repository ignores corrupt persisted profile JSON',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesOnboardingRepository.profileKey: '{not json',
+      });
+      final repository = await SharedPreferencesOnboardingRepository.create();
+
+      expect(await repository.loadProfile(), isNull);
+    },
+  );
+
+  test(
+    'shared preferences repository ignores wrong persisted profile shape',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesOnboardingRepository.profileKey: '["not", "a map"]',
+      });
+      final repository = await SharedPreferencesOnboardingRepository.create();
+
+      expect(await repository.loadProfile(), isNull);
+    },
+  );
 }

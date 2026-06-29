@@ -1,6 +1,7 @@
 import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/repositories/health_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('InMemoryHealthRepository', () {
@@ -55,6 +56,64 @@ void main() {
       expect(state.status, HealthConnectionStatus.unavailable);
       expect(state.canRequestConnection, isFalse);
       expect(state.explainer, contains('not available'));
+    });
+  });
+
+  group('SharedPreferencesHealthRepository', () {
+    test('ignores corrupt persisted health signals', () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesHealthRepository.statusKey: 'connected',
+        SharedPreferencesHealthRepository.enabledTypesKey: ['weight'],
+        SharedPreferencesHealthRepository.signalsKey: '{"weightKg":',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesHealthRepository(
+        preferences,
+        provider: const MockHealthDataProvider(signals: null),
+      );
+
+      final state = await repository.loadState();
+
+      expect(state.status, HealthConnectionStatus.connected);
+      expect(state.signals, isNull);
+    });
+
+    test('ignores wrong persisted health signal shape', () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesHealthRepository.statusKey: 'connected',
+        SharedPreferencesHealthRepository.enabledTypesKey: ['weight'],
+        SharedPreferencesHealthRepository.signalsKey: '[78.4]',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesHealthRepository(
+        preferences,
+        provider: const MockHealthDataProvider(signals: null),
+      );
+
+      final state = await repository.loadState();
+
+      expect(state.status, HealthConnectionStatus.connected);
+      expect(state.signals, isNull);
+    });
+
+    test('loads valid legacy persisted health signals', () async {
+      SharedPreferences.setMockInitialValues({
+        SharedPreferencesHealthRepository.statusKey: 'connected',
+        SharedPreferencesHealthRepository.enabledTypesKey: ['weight'],
+        SharedPreferencesHealthRepository.signalsKey:
+            '{"weightKg": 78.4, "capturedAt": "2026-06-29T15:30:00.000"}',
+      });
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesHealthRepository(
+        preferences,
+        provider: const MockHealthDataProvider(signals: null),
+      );
+
+      final state = await repository.loadState();
+
+      expect(state.status, HealthConnectionStatus.connected);
+      expect(state.signals?.weightKg, 78.4);
+      expect(state.signals?.capturedAt, DateTime(2026, 6, 29, 15, 30));
     });
   });
 }

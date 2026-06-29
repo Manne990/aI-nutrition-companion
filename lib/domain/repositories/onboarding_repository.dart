@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/onboarding.dart';
+import 'persisted_json.dart';
 
 abstract interface class OnboardingRepository {
   Future<OnboardingProfile?> loadProfile();
@@ -31,14 +32,12 @@ class SharedPreferencesOnboardingRepository implements OnboardingRepository {
       return null;
     }
 
-    final decoded = jsonDecode(rawProfile);
-    if (decoded is! Map) {
+    final decoded = decodePersistedJsonMap(rawProfile);
+    if (decoded == null) {
       return null;
     }
 
-    final profile = OnboardingProfile.fromJson(
-      Map<String, Object?>.from(decoded),
-    );
+    final profile = OnboardingProfile.fromJson(decoded);
     return profile.hasRequiredConsent ? profile : null;
   }
 
