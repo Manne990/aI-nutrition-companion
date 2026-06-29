@@ -1,3 +1,4 @@
+import '../../domain/models/ai_settings.dart';
 import '../../domain/models/meal_suggestion.dart';
 import '../../domain/models/nutrition.dart';
 
@@ -6,25 +7,32 @@ abstract interface class NutritionCompanionAdapter {
 }
 
 class MockNutritionCompanionAdapter implements NutritionCompanionAdapter {
-  const MockNutritionCompanionAdapter();
+  const MockNutritionCompanionAdapter({this.configuration});
+
+  final AiAdapterConfiguration? configuration;
 
   @override
   List<MealSuggestion> mealSuggestions({UserPreferences? preferences}) {
     final preferenceSummary = preferences?.dietaryPreferences.isEmpty ?? true
         ? 'quick to make'
         : '${preferences!.dietaryPreferences.first}, quick to make';
+    final provider = configuration?.providerLabel ?? 'Mock AI';
+    final model = configuration?.settings.model ?? 'mock-companion-v1';
+    final source = configuration?.shouldUseMock ?? true
+        ? NutritionSource.aiEstimated
+        : NutritionSource.fallback;
 
     return [
       MealSuggestion(
         title: 'Skyr bowl with berries',
         summary:
-            'High protein, $preferenceSummary, and aligned with ${preferences?.primaryGoal.toLowerCase() ?? 'today goals'}.',
+            'High protein, $preferenceSummary, and aligned with ${preferences?.primaryGoal.toLowerCase() ?? 'today goals'} using $provider $model.',
         proteinGrams: 32,
         calories: 410,
         prepMinutes: 6,
         ingredientAvailability: 'All ingredients available',
         nutritionRationale: 'Closes most of today protein gap',
-        source: NutritionSource.aiEstimated,
+        source: source,
         imageAssetKey: 'fixture-skyr-bowl',
       ),
       MealSuggestion(

@@ -108,6 +108,11 @@ app. User-provided tokens should be stored on device when secure platform
 storage is available, and mock AI should remain the default local development
 path until real provider configuration is implemented.
 
+Provider/model settings and local token storage are documented in
+[`docs/ai-provider-settings.md`](docs/ai-provider-settings.md). Mock AI remains
+the default for tests and local CI; real provider calls are still stubbed behind
+the adapter configuration.
+
 ## Project Structure
 
 ```text

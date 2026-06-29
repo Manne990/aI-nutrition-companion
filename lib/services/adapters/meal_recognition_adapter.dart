@@ -1,3 +1,4 @@
+import '../../domain/models/ai_settings.dart';
 import '../../domain/models/nutrition.dart';
 import '../photo/photo_meal_source.dart';
 
@@ -15,9 +16,13 @@ class MealRecognitionException implements Exception {
 }
 
 class MockMealRecognitionAdapter implements MealRecognitionAdapter {
-  const MockMealRecognitionAdapter({this.shouldFail = false});
+  const MockMealRecognitionAdapter({
+    this.shouldFail = false,
+    this.configuration,
+  });
 
   final bool shouldFail;
+  final AiAdapterConfiguration? configuration;
 
   @override
   Future<MealEstimate> estimateMealFromPhoto(PhotoMealCapture capture) async {
@@ -28,10 +33,13 @@ class MockMealRecognitionAdapter implements MealRecognitionAdapter {
     }
 
     final capturedAt = DateTime(2026, 6, 29, 17, 45);
+    final provider = configuration == null
+        ? 'mock-photo-ai'
+        : '${configuration!.providerLabel} ${configuration!.settings.model}';
     final source = SourceMetadata(
       source: NutritionSource.aiEstimated,
       label: 'AI photo estimate',
-      provider: 'mock-photo-ai',
+      provider: provider,
       confidence: capture.mode == PhotoMealCaptureMode.camera ? 0.78 : 0.74,
       observedAt: capturedAt,
     );
