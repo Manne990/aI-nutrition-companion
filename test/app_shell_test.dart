@@ -1,20 +1,51 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
+import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
+import 'package:ai_nutrition_companion/domain/repositories/onboarding_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+OnboardingProfile _profile() {
+  return OnboardingProfile(
+    primaryGoal: 'Build steady high-protein habits',
+    proteinGoalGrams: 110,
+    dietaryPreferences: const ['high protein'],
+    coachingTone: 'calm and practical',
+    acceptedNutritionDisclaimer: true,
+    acceptedAiGuidanceDisclaimer: true,
+    acceptedPrivacyBoundary: true,
+    completedAt: DateTime(2026, 6, 29),
+  );
+}
+
+Future<void> _pumpApp(
+  WidgetTester tester, {
+  InMemoryOnboardingRepository? repository,
+}) async {
+  await tester.pumpWidget(
+    AiNutritionCompanionApp(
+      onboardingRepository:
+          repository ?? InMemoryOnboardingRepository(_profile()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('app shell renders Today and bottom navigation', (tester) async {
-    await tester.pumpWidget(const AiNutritionCompanionApp());
+  testWidgets('returning user sees Today and bottom navigation', (
+    tester,
+  ) async {
+    await _pumpApp(tester);
 
     expect(find.text('What should I eat next?'), findsOneWidget);
     expect(find.text('Skyr bowl with berries'), findsOneWidget);
+    expect(find.text('110g protein goal'), findsOneWidget);
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Kitchen'), findsOneWidget);
     expect(find.text('Me'), findsOneWidget);
   });
 
   testWidgets('bottom navigation switches between V1 sections', (tester) async {
-    await tester.pumpWidget(const AiNutritionCompanionApp());
+    await _pumpApp(tester);
 
     await tester.tap(find.byIcon(Icons.restaurant_menu_outlined));
     await tester.pumpAndSettle();
@@ -26,4 +57,55 @@ void main() {
 
     expect(find.text('AI provider'), findsOneWidget);
   });
+
+  testWidgets('first-run user can skip optional steps and complete consent', (
+    tester,
+  ) async {
+    final repository = InMemoryOnboardingRepository();
+
+    await _pumpApp(tester, repository: repository);
+
+    expect(find.text('Set your direction'), findsOneWidget);
+
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Food boundaries'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('Targets and tone'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('Consent boundaries'), findsOneWidget);
+    expect(find.text('Start Today'), findsOneWidget);
+
+    await tester.tap(find.byType(CheckboxListTile).at(0));
+    await tester.tap(find.byType(CheckboxListTile).at(1));
+    await tester.tap(find.byType(CheckboxListTile).at(2));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Start Today'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('What should I eat next?'), findsOneWidget);
+    expect((await repository.loadProfile())?.hasRequiredConsent, isTrue);
+  });
+
+  testWidgets(
+    'reset onboarding clears local profile for tests and development',
+    (tester) async {
+      final repository = InMemoryOnboardingRepository(_profile());
+
+      await _pumpApp(tester, repository: repository);
+
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Reset onboarding'));
+      await tester.pumpAndSettle();
+
+      expect(await repository.loadProfile(), isNull);
+      expect(find.text('Set your direction'), findsOneWidget);
+    },
+  );
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_theme.dart';
 import '../../domain/models/meal_suggestion.dart';
 import '../../domain/models/nutrition.dart';
+import '../../domain/models/onboarding.dart';
 import '../../domain/repositories/nutrition_repository.dart';
 import '../../services/adapters/nutrition_companion_adapter.dart';
 import '../../shared/widgets/ai_message_bubble.dart';
@@ -16,11 +17,13 @@ import '../../shared/widgets/source_chip.dart';
 class TodayScreen extends StatefulWidget {
   const TodayScreen({
     super.key,
+    required this.profile,
     this.adapter = const MockNutritionCompanionAdapter(),
     this.repository,
     this.now,
   });
 
+  final OnboardingProfile profile;
   final NutritionCompanionAdapter adapter;
   final NutritionRepository? repository;
   final DateTime? now;
@@ -38,24 +41,37 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   void initState() {
     super.initState();
-    _suggestions = widget.adapter.mealSuggestions();
+    _suggestions = _loadSuggestions();
   }
 
   @override
   void didUpdateWidget(covariant TodayScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.adapter != widget.adapter) {
-      _suggestions = widget.adapter.mealSuggestions();
+    if (oldWidget.adapter != widget.adapter ||
+        oldWidget.profile != widget.profile) {
+      _suggestions = _loadSuggestions();
       _selectedSuggestionIndex = 0;
       _lastAction = _SuggestionAction.none;
       _aiChoiceMessage = null;
     }
   }
 
+  List<MealSuggestion> _loadSuggestions() {
+    return widget.adapter.mealSuggestions(
+      preferences: widget.profile.toUserPreferences(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
-    final repository = widget.repository ?? InMemoryNutritionRepository();
+    final userPreferences = widget.profile.toUserPreferences();
+    final repository =
+        widget.repository ??
+        InMemoryNutritionRepository(
+          seedGoal: widget.profile.toNutritionGoal(calories: 2200),
+          seedPreferences: userPreferences,
+        );
     final summary = repository.dailySummary(now);
     final suggestion = _activeSuggestion;
 
@@ -74,6 +90,21 @@ class _TodayScreenState extends State<TodayScreen> {
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            AppChip(
+              label: widget.profile.primaryGoal,
+              icon: Icons.flag_outlined,
+            ),
+            AppChip(
+              label: '${widget.profile.proteinGoalGrams.round()}g protein goal',
+              icon: Icons.fitness_center,
+            ),
+          ],
         ),
         const SizedBox(height: AppSpacing.lg),
         _TodayRhythmCard(now: now, summary: summary),
