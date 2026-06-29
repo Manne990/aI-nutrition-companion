@@ -5,7 +5,9 @@ import '../../domain/models/meal_suggestion.dart';
 import '../../domain/models/nutrition.dart';
 import '../../domain/models/onboarding.dart';
 import '../../domain/repositories/nutrition_repository.dart';
+import '../../services/adapters/meal_recognition_adapter.dart';
 import '../../services/adapters/nutrition_companion_adapter.dart';
+import '../../services/photo/photo_meal_source.dart';
 import '../../shared/widgets/ai_message_bubble.dart';
 import '../../shared/widgets/app_action_buttons.dart';
 import '../../shared/widgets/app_chip.dart';
@@ -13,6 +15,7 @@ import '../../shared/widgets/app_metric_row.dart';
 import '../../shared/widgets/app_section_card.dart';
 import '../../shared/widgets/food_image_card.dart';
 import '../../shared/widgets/source_chip.dart';
+import '../photo_logging/photo_meal_logging_card.dart';
 
 class TodayScreen extends StatefulWidget {
   const TodayScreen({
@@ -20,12 +23,16 @@ class TodayScreen extends StatefulWidget {
     required this.profile,
     this.adapter = const MockNutritionCompanionAdapter(),
     this.repository,
+    this.photoMealSource,
+    this.mealRecognitionAdapter = const MockMealRecognitionAdapter(),
     this.now,
   });
 
   final OnboardingProfile profile;
   final NutritionCompanionAdapter adapter;
   final NutritionRepository? repository;
+  final PhotoMealSource? photoMealSource;
+  final MealRecognitionAdapter mealRecognitionAdapter;
   final DateTime? now;
 
   @override
@@ -34,6 +41,7 @@ class TodayScreen extends StatefulWidget {
 
 class _TodayScreenState extends State<TodayScreen> {
   late List<MealSuggestion> _suggestions;
+  late NutritionRepository _repository;
   int _selectedSuggestionIndex = 0;
   _SuggestionAction _lastAction = _SuggestionAction.none;
   String? _aiChoiceMessage;
@@ -41,6 +49,7 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   void initState() {
     super.initState();
+    _repository = _createRepository();
     _suggestions = _loadSuggestions();
   }
 
@@ -54,6 +63,18 @@ class _TodayScreenState extends State<TodayScreen> {
       _lastAction = _SuggestionAction.none;
       _aiChoiceMessage = null;
     }
+    if (oldWidget.repository != widget.repository ||
+        oldWidget.profile != widget.profile) {
+      _repository = _createRepository();
+    }
+  }
+
+  NutritionRepository _createRepository() {
+    return widget.repository ??
+        InMemoryNutritionRepository(
+          seedGoal: widget.profile.toNutritionGoal(calories: 2200),
+          seedPreferences: widget.profile.toUserPreferences(),
+        );
   }
 
   List<MealSuggestion> _loadSuggestions() {
@@ -65,14 +86,7 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   Widget build(BuildContext context) {
     final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
-    final userPreferences = widget.profile.toUserPreferences();
-    final repository =
-        widget.repository ??
-        InMemoryNutritionRepository(
-          seedGoal: widget.profile.toNutritionGoal(calories: 2200),
-          seedPreferences: userPreferences,
-        );
-    final summary = repository.dailySummary(now);
+    final summary = _repository.dailySummary(now);
     final suggestion = _activeSuggestion;
 
     return ListView(
@@ -86,7 +100,7 @@ class _TodayScreenState extends State<TodayScreen> {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          _dayFocus(repository.userPreferences()),
+          _dayFocus(_repository.userPreferences()),
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
@@ -126,6 +140,16 @@ class _TodayScreenState extends State<TodayScreen> {
             _dailyRhythmCopy(summary),
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        PhotoMealLoggingCard(
+          repository: _repository,
+          photoSource: widget.photoMealSource,
+          recognitionAdapter: widget.mealRecognitionAdapter,
+          now: now,
+          onMealSaved: (_) => setState(() {
+            _aiChoiceMessage = 'Meal saved. Today totals were updated.';
+          }),
         ),
         const SizedBox(height: AppSpacing.md),
         const AppSectionCard(

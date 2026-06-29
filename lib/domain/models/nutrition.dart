@@ -227,6 +227,7 @@ class Meal {
     required this.eatenAt,
     required this.items,
     required this.source,
+    this.photoPath,
   });
 
   final String id;
@@ -234,6 +235,7 @@ class Meal {
   final DateTime eatenAt;
   final List<MealItem> items;
   final SourceMetadata source;
+  final String? photoPath;
 
   MacroTotals get knownMacroTotals => sumKnownMacros(items);
 
@@ -270,6 +272,7 @@ class MealEstimate {
         source: NutritionSource.userConfirmed,
         label: 'User confirmed meal',
       ),
+      photoPath: photoPath,
     );
   }
 }
