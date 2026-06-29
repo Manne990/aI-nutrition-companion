@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/app_theme.dart';
 import '../../domain/models/meal_suggestion.dart';
+import 'app_chip.dart';
 
 class SourceChip extends StatelessWidget {
   const SourceChip({super.key, required this.source});
@@ -10,23 +10,7 @@ class SourceChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: AppColors.leafGreen.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        child: Text(
-          _label,
-          style: const TextStyle(
-            color: AppColors.deepGreen,
-            fontWeight: FontWeight.w800,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
+    return AppChip(label: _label, tone: AppChipTone.success);
   }
 
   String get _label {
