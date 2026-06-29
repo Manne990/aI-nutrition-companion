@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
 import 'theme/app_theme.dart';
+import '../domain/repositories/ai_chat_repository.dart';
 import '../domain/repositories/ai_settings_repository.dart';
 import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
@@ -12,11 +13,13 @@ class AiNutritionCompanionApp extends StatefulWidget {
     this.onboardingRepository,
     this.aiSettingsRepository,
     this.healthRepository,
+    this.aiChatRepository,
   });
 
   final OnboardingRepository? onboardingRepository;
   final AiSettingsRepository? aiSettingsRepository;
   final HealthRepository? healthRepository;
+  final AiChatRepository? aiChatRepository;
 
   @override
   State<AiNutritionCompanionApp> createState() =>
@@ -42,11 +45,15 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
     final healthRepository = widget.healthRepository == null
         ? await SharedPreferencesHealthRepository.create()
         : widget.healthRepository!;
+    final aiChatRepository = widget.aiChatRepository == null
+        ? await SharedPreferencesAiChatRepository.create()
+        : widget.aiChatRepository!;
 
     return _AppRepositories(
       onboardingRepository: onboardingRepository,
       aiSettingsRepository: aiSettingsRepository,
       healthRepository: healthRepository,
+      aiChatRepository: aiChatRepository,
     );
   }
 
@@ -65,6 +72,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
               onboardingRepository: repositories.onboardingRepository,
               aiSettingsRepository: repositories.aiSettingsRepository,
               healthRepository: repositories.healthRepository,
+              aiChatRepository: repositories.aiChatRepository,
             );
           }
           return const Scaffold(
@@ -81,9 +89,11 @@ class _AppRepositories {
     required this.onboardingRepository,
     required this.aiSettingsRepository,
     required this.healthRepository,
+    required this.aiChatRepository,
   });
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
   final HealthRepository healthRepository;
+  final AiChatRepository aiChatRepository;
 }
