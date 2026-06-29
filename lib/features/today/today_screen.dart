@@ -95,6 +95,7 @@ class _TodayScreenState extends State<TodayScreen> {
     final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
     final summary = _repository.dailySummary(now);
     final suggestion = _activeSuggestion;
+    final quickLogSuggestions = _repository.quickLogSuggestions(now);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
@@ -165,20 +166,10 @@ class _TodayScreenState extends State<TodayScreen> {
           }),
         ),
         const SizedBox(height: AppSpacing.md),
-        const AppSectionCard(
-          title: 'Quick Log',
-          backgroundColor: AppColors.deepGreen,
-          foregroundColor: AppColors.warmSurface,
-          trailing: AppChip(label: 'Habit detected', tone: AppChipTone.inverse),
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              AppChip(label: 'Greek yogurt', tone: AppChipTone.inverse),
-              AppChip(label: 'Chicken salad', tone: AppChipTone.inverse),
-              AppChip(label: 'Banana', tone: AppChipTone.inverse),
-            ],
-          ),
+        _QuickLogCard(
+          suggestions: quickLogSuggestions,
+          onConfirm: (quickLogSuggestion) =>
+              _confirmQuickLog(quickLogSuggestion, now),
         ),
         const SizedBox(height: AppSpacing.md),
         AiMessageBubble(
@@ -269,6 +260,13 @@ class _TodayScreenState extends State<TodayScreen> {
     setState(() {
       _weightController.clear();
       _aiChoiceMessage = 'Weight saved. Trend updated for today.';
+    });
+  }
+
+  void _confirmQuickLog(QuickLogSuggestion suggestion, DateTime now) {
+    _repository.confirmQuickLogSuggestion(suggestion, eatenAt: now);
+    setState(() {
+      _aiChoiceMessage = '${suggestion.mealName} added from Quick Log.';
     });
   }
 }
@@ -703,6 +701,144 @@ class _WeightTracker extends StatelessWidget {
   }
 }
 
+class _QuickLogCard extends StatelessWidget {
+  const _QuickLogCard({required this.suggestions, required this.onConfirm});
+
+  final List<QuickLogSuggestion> suggestions;
+  final ValueChanged<QuickLogSuggestion> onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    if (suggestions.isEmpty) {
+      return const AppSectionCard(
+        title: 'Quick Log',
+        backgroundColor: AppColors.deepGreen,
+        foregroundColor: AppColors.warmSurface,
+        trailing: AppChip(
+          label: 'Learning',
+          tone: AppChipTone.inverse,
+          icon: Icons.auto_graph,
+        ),
+        child: Text(
+          'Log a few meals and common snacks will appear here for one-tap confirmation.',
+          style: TextStyle(color: AppColors.warmSurface),
+        ),
+      );
+    }
+
+    return AppSectionCard(
+      title: 'Quick Log',
+      backgroundColor: AppColors.deepGreen,
+      foregroundColor: AppColors.warmSurface,
+      trailing: const AppChip(
+        label: 'Habit detected',
+        tone: AppChipTone.inverse,
+        icon: Icons.auto_graph,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${suggestions.first.timeWindowLabel} suggestions from your meal rhythm.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: AppColors.warmSurface),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final suggestion in suggestions) ...[
+            _QuickLogSuggestionRow(
+              suggestion: suggestion,
+              onConfirm: () => onConfirm(suggestion),
+            ),
+            if (suggestion != suggestions.last)
+              const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickLogSuggestionRow extends StatelessWidget {
+  const _QuickLogSuggestionRow({
+    required this.suggestion,
+    required this.onConfirm,
+  });
+
+  final QuickLogSuggestion suggestion;
+  final VoidCallback onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    final macros = suggestion.macroTotals;
+    final macroLabel = macros == null
+        ? 'Nutrition pending'
+        : '${macros.calories.round()} kcal | ${macros.proteinGrams.round()}g protein';
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.warmSurface.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        suggestion.mealName,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppColors.warmSurface),
+                      ),
+                      const SizedBox(height: AppSpacing.xxs),
+                      Text(
+                        '${suggestion.reason}. $macroLabel.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.warmSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                FilledButton.tonalIcon(
+                  onPressed: onConfirm,
+                  icon: const Icon(Icons.add_circle_outline),
+                  label: const Text('Log'),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.xs,
+              runSpacing: AppSpacing.xs,
+              children: [
+                AppChip(
+                  label: _availabilityLabel(suggestion.availability),
+                  tone: AppChipTone.inverse,
+                  icon: Icons.kitchen_outlined,
+                ),
+                AppChip(
+                  label: suggestion.source.label ?? 'Habit suggestion',
+                  tone: AppChipTone.inverse,
+                  icon: Icons.auto_awesome,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptySuggestionCard extends StatelessWidget {
   const _EmptySuggestionCard();
 
@@ -811,6 +947,15 @@ String _weightTrendLabel(DailySummary summary) {
   }
   final direction = delta > 0 ? 'Up' : 'Down';
   return '$direction ${delta.abs().toStringAsFixed(1)} kg';
+}
+
+String _availabilityLabel(IngredientAvailability availability) {
+  return switch (availability) {
+    IngredientAvailability.available => 'Available',
+    IngredientAvailability.runningLow => 'Check quantity',
+    IngredientAvailability.missing => 'Missing',
+    IngredientAvailability.unknown => 'Availability unknown',
+  };
 }
 
 String _formatTime(DateTime date) {

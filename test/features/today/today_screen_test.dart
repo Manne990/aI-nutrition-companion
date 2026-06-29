@@ -242,6 +242,43 @@ void main() {
     expect(find.text('Weight saved. Trend updated for today.'), findsOneWidget);
   });
 
+  testWidgets('quick log confirmation adds a snack to today', (tester) async {
+    final repository = InMemoryNutritionRepository();
+
+    await tester.pumpWidget(
+      _wrap(
+        TodayScreen(
+          profile: profile,
+          adapter: _FixtureAdapter([firstSuggestion]),
+          repository: repository,
+          now: DateTime(2026, 6, 29, 16),
+        ),
+      ),
+    );
+
+    await _scrollUntilVisible(tester, find.text('Quick Log'));
+
+    expect(
+      find.text('Afternoon suggestions from your meal rhythm.'),
+      findsOneWidget,
+    );
+    expect(find.text('Banana snack'), findsOneWidget);
+
+    await tester.tap(find.text('Log').first);
+    await tester.pumpAndSettle();
+
+    expect(repository.meals(), hasLength(3));
+    expect(repository.meals().last.name, 'Banana snack');
+    expect(repository.meals().last.source.label, 'Quick Log confirmed meal');
+
+    await _scrollUntilVisible(
+      tester,
+      find.text('Banana snack added from Quick Log.'),
+    );
+
+    expect(find.text('Banana snack added from Quick Log.'), findsOneWidget);
+  });
+
   testWidgets('completed day state keeps guidance actionable', (tester) async {
     final repository = InMemoryNutritionRepository(
       seedMeals: [NutritionSeedData.meals.first],

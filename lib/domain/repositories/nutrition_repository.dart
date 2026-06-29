@@ -9,11 +9,17 @@ abstract interface class NutritionRepository {
 
   List<WeightEntry> weightEntries();
 
+  List<KitchenInventoryItem> kitchenInventory();
+
+  List<KitchenFavoriteMeal> favoriteMeals();
+
   NutritionGoal nutritionGoal();
 
   UserPreferences userPreferences();
 
   DailySummary dailySummary(DateTime date);
+
+  List<QuickLogSuggestion> quickLogSuggestions(DateTime now);
 
   Future<NutritionLookupResult> lookupFood(NutritionLookupQuery query);
 
@@ -22,6 +28,11 @@ abstract interface class NutritionRepository {
   Future<MealEstimate> enrichMealEstimate(MealEstimate estimate);
 
   Meal saveMeal(Meal meal);
+
+  Meal confirmQuickLogSuggestion(
+    QuickLogSuggestion suggestion, {
+    required DateTime eatenAt,
+  });
 
   WeightEntry saveWeightEntry(WeightEntry entry);
 }
@@ -70,6 +81,16 @@ class InMemoryNutritionRepository implements NutritionRepository {
   List<WeightEntry> weightEntries() => List.unmodifiable(_weightEntries);
 
   @override
+  List<KitchenInventoryItem> kitchenInventory() {
+    return buildKitchenInventory(foods: _foods, meals: _meals);
+  }
+
+  @override
+  List<KitchenFavoriteMeal> favoriteMeals() {
+    return buildFavoriteMeals(_meals);
+  }
+
+  @override
   NutritionGoal nutritionGoal() => _goal;
 
   @override
@@ -83,6 +104,11 @@ class InMemoryNutritionRepository implements NutritionRepository {
       goal: _goal,
       weights: _weightEntries,
     );
+  }
+
+  @override
+  List<QuickLogSuggestion> quickLogSuggestions(DateTime now) {
+    return buildQuickLogSuggestions(now: now, foods: _foods, meals: _meals);
   }
 
   @override
@@ -106,6 +132,14 @@ class InMemoryNutritionRepository implements NutritionRepository {
     _meals.add(meal);
     _meals.sort((a, b) => a.eatenAt.compareTo(b.eatenAt));
     return meal;
+  }
+
+  @override
+  Meal confirmQuickLogSuggestion(
+    QuickLogSuggestion suggestion, {
+    required DateTime eatenAt,
+  }) {
+    return saveMeal(suggestion.toMeal(eatenAt: eatenAt));
   }
 
   @override

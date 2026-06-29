@@ -69,7 +69,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.restaurant_menu_outlined));
     await tester.pumpAndSettle();
 
-    expect(find.text('Favorites'), findsOneWidget);
+    expect(find.text('Favorite meals'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.person_outline));
     await tester.pumpAndSettle();

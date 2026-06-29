@@ -181,5 +181,83 @@ void main() {
       expect(summary.meals.single.name, 'Protein snack corrected');
       expect(summary.knownMacroTotals.proteinGrams, 22);
     });
+
+    test('quickLogSuggestions prefer known time-window history', () {
+      final repository = InMemoryNutritionRepository();
+
+      final suggestions = repository.quickLogSuggestions(
+        DateTime(2026, 6, 29, 12, 45),
+      );
+
+      expect(suggestions.first.mealName, 'Chicken salad');
+      expect(suggestions.first.timeWindowLabel, 'Midday');
+      expect(
+        suggestions.first.reason,
+        contains('Usually logged around midday'),
+      );
+      expect(suggestions.first.availability, IngredientAvailability.runningLow);
+    });
+
+    test(
+      'quickLogSuggestions use deterministic defaults for sparse windows',
+      () {
+        final repository = InMemoryNutritionRepository(seedMeals: const []);
+
+        final suggestions = repository.quickLogSuggestions(
+          DateTime(2026, 6, 29, 23, 15),
+        );
+
+        expect(suggestions.map((suggestion) => suggestion.mealName), [
+          'Skyr bowl',
+          'Banana snack',
+        ]);
+        expect(suggestions.first.timeWindowLabel, 'Late');
+        expect(suggestions.first.reason, 'Light option for a late check-in');
+      },
+    );
+
+    test('confirmQuickLogSuggestion persists a user-confirmed meal', () {
+      final repository = InMemoryNutritionRepository(seedMeals: const []);
+      final suggestion = repository
+          .quickLogSuggestions(DateTime(2026, 6, 29, 16))
+          .first;
+
+      final meal = repository.confirmQuickLogSuggestion(
+        suggestion,
+        eatenAt: DateTime(2026, 6, 29, 16, 5),
+      );
+
+      expect(meal.source.label, 'Quick Log confirmed meal');
+      expect(meal.items.single.source.label, 'Quick Log confirmed');
+      expect(repository.meals(), hasLength(1));
+      expect(
+        repository.dailySummary(DateTime(2026, 6, 29)).meals.single.id,
+        meal.id,
+      );
+    });
+
+    test('favorite meals and kitchen inventory derive from local data', () {
+      final repository = InMemoryNutritionRepository();
+
+      final favorites = repository.favoriteMeals();
+      final inventory = repository.kitchenInventory();
+
+      expect(favorites.map((favorite) => favorite.name), [
+        'Chicken salad',
+        'Skyr bowl',
+      ]);
+      expect(
+        inventory
+            .firstWhere((item) => item.food.id == 'food-skyr')
+            .availability,
+        IngredientAvailability.available,
+      );
+      expect(
+        inventory
+            .firstWhere((item) => item.food.id == 'food-chicken-salad')
+            .availability,
+        IngredientAvailability.runningLow,
+      );
+    });
   });
 }
