@@ -84,6 +84,15 @@ bash scripts/local_ci.sh
 The full local CI command runs dependency resolution, format checking, static
 analysis, and tests.
 
+## Release Readiness
+
+V1 store-preparation guidance lives in
+[`docs/release-readiness.md`](docs/release-readiness.md). It tracks the
+remaining App Store and Google Play work, privacy policy requirements,
+nutrition/AI disclaimer placement, user-provided token disclosures, future
+health-data considerations, release build commands, screenshot/metadata needs,
+and the pre-submission test matrix.
+
 ## Environment Variables
 
 No environment variables are required for the default V1 local app. Nutrition
