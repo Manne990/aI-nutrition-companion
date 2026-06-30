@@ -105,9 +105,12 @@ public, user-owned, or explicitly client-safe; app-owned secrets require a
 backend or proxy before production use.
 
 The FoodData Central adapter contract reports an explicit missing-key fallback
-state when `FOODDATA_CENTRAL_API_KEY` is absent. A future network-backed
-implementation should read that variable outside the mobile binary and must not
-ship production secrets in the app.
+state until a user-provided or runtime-injected API key is available. The V1
+mobile boundary parses production-shaped FoodData Central search payloads behind
+an injected client so tests stay deterministic and no live network call is
+required for local CI. App-owned FoodData Central keys must not ship in the
+mobile binary; a production app-owned key requires a future backend or proxy
+that keeps the secret server-side.
 
 Future AI provider work must not hard-code production API keys in the mobile
 app. User-provided tokens should be stored on device when secure platform
