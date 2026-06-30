@@ -324,22 +324,17 @@ class _MeScreenState extends State<MeScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
+          AppActionButtonGroup(
             children: [
-              Expanded(
-                child: AppSecondaryButton(
-                  label: tokenState.hasToken ? 'Update token' : 'Save token',
-                  icon: Icons.key,
-                  onPressed: _saveToken,
-                ),
+              AppSecondaryButton(
+                label: tokenState.hasToken ? 'Update token' : 'Save token',
+                icon: Icons.key,
+                onPressed: _saveToken,
               ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: AppSecondaryButton(
-                  label: 'Delete token',
-                  icon: Icons.delete_outline,
-                  onPressed: tokenState.hasToken ? _deleteToken : null,
-                ),
+              AppSecondaryButton(
+                label: 'Delete token',
+                icon: Icons.delete_outline,
+                onPressed: tokenState.hasToken ? _deleteToken : null,
               ),
             ],
           ),
@@ -417,24 +412,19 @@ class _MeScreenState extends State<MeScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Row(
+          AppActionButtonGroup(
             children: [
-              Expanded(
-                child: AppSecondaryButton(
-                  label: keyState.hasKey
-                      ? 'Update FoodData Central key'
-                      : 'Save FoodData Central key',
-                  icon: Icons.key,
-                  onPressed: _saveFoodDataCentralKey,
-                ),
+              AppSecondaryButton(
+                label: keyState.hasKey
+                    ? 'Update FoodData Central key'
+                    : 'Save FoodData Central key',
+                icon: Icons.key,
+                onPressed: _saveFoodDataCentralKey,
               ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: AppSecondaryButton(
-                  label: 'Delete FoodData Central key',
-                  icon: Icons.delete_outline,
-                  onPressed: keyState.hasKey ? _deleteFoodDataCentralKey : null,
-                ),
+              AppSecondaryButton(
+                label: 'Delete FoodData Central key',
+                icon: Icons.delete_outline,
+                onPressed: keyState.hasKey ? _deleteFoodDataCentralKey : null,
               ),
             ],
           ),

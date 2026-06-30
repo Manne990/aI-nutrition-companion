@@ -62,6 +62,54 @@ class AppSecondaryButton extends StatelessWidget {
   }
 }
 
+class AppActionButtonGroup extends StatelessWidget {
+  const AppActionButtonGroup({
+    super.key,
+    required this.children,
+    this.stackedBreakpoint = 360,
+  });
+
+  final List<Widget> children;
+  final double stackedBreakpoint;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final shouldStack = constraints.maxWidth <= stackedBreakpoint;
+        final spacedChildren = <Widget>[];
+
+        for (var i = 0; i < children.length; i += 1) {
+          if (i > 0) {
+            spacedChildren.add(
+              SizedBox(
+                width: shouldStack ? 0 : AppSpacing.xs,
+                height: shouldStack ? AppSpacing.xs : 0,
+              ),
+            );
+          }
+
+          final child = SizedBox(width: double.infinity, child: children[i]);
+          spacedChildren.add(shouldStack ? child : Expanded(child: child));
+        }
+
+        if (shouldStack) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: spacedChildren,
+          );
+        }
+
+        return Row(children: spacedChildren);
+      },
+    );
+  }
+}
+
 class AppIconActionButton extends StatelessWidget {
   const AppIconActionButton({
     super.key,

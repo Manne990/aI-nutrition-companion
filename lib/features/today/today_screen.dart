@@ -513,22 +513,17 @@ class _SuggestionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
-                Row(
+                AppActionButtonGroup(
                   children: [
-                    Expanded(
-                      child: AppSecondaryButton(
-                        label: 'Change',
-                        icon: Icons.refresh,
-                        onPressed: onRefresh,
-                      ),
+                    AppSecondaryButton(
+                      label: 'Change',
+                      icon: Icons.refresh,
+                      onPressed: onRefresh,
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: AppSecondaryButton(
-                        label: 'Not now',
-                        icon: Icons.schedule_outlined,
-                        onPressed: onDefer,
-                      ),
+                    AppSecondaryButton(
+                      label: 'Not now',
+                      icon: Icons.schedule_outlined,
+                      onPressed: onDefer,
                     ),
                   ],
                 ),
