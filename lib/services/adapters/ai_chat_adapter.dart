@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
 import '../../domain/models/ai_chat.dart';
+import '../../domain/models/ai_settings.dart';
 
 abstract interface class AiChatAdapter {
   Future<AiChatResponse> sendMessage({
@@ -6,6 +11,314 @@ abstract interface class AiChatAdapter {
     required AiChatContext context,
     required List<AiChatMessage> history,
   });
+}
+
+typedef AiProviderTokenReader = Future<String?> Function();
+
+abstract interface class AiProviderTransport {
+  Future<AiProviderTransportResponse> post({
+    required Uri uri,
+    required Map<String, String> headers,
+    required String body,
+  });
+}
+
+class AiProviderTransportResponse {
+  const AiProviderTransportResponse({
+    required this.statusCode,
+    required this.body,
+  });
+
+  final int statusCode;
+  final String body;
+}
+
+class HttpAiProviderTransport implements AiProviderTransport {
+  const HttpAiProviderTransport({this.timeout = const Duration(seconds: 30)});
+
+  final Duration timeout;
+
+  @override
+  Future<AiProviderTransportResponse> post({
+    required Uri uri,
+    required Map<String, String> headers,
+    required String body,
+  }) async {
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri).timeout(timeout);
+      headers.forEach(request.headers.set);
+      request.write(body);
+      final response = await request.close().timeout(timeout);
+      final responseBody = await utf8.decoder
+          .bind(response)
+          .join()
+          .timeout(timeout);
+      return AiProviderTransportResponse(
+        statusCode: response.statusCode,
+        body: responseBody,
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+}
+
+class RealProviderAiChatAdapter implements AiChatAdapter {
+  const RealProviderAiChatAdapter({
+    required this.configuration,
+    required this.readToken,
+    this.transport = const HttpAiProviderTransport(),
+  });
+
+  final AiAdapterConfiguration configuration;
+  final AiProviderTokenReader readToken;
+  final AiProviderTransport transport;
+
+  @override
+  Future<AiChatResponse> sendMessage({
+    required String prompt,
+    required AiChatContext context,
+    required List<AiChatMessage> history,
+  }) async {
+    if (configuration.settings.usesMockProvider) {
+      return const MockAiChatAdapter().sendMessage(
+        prompt: prompt,
+        context: context,
+        history: history,
+      );
+    }
+
+    if (!configuration.tokenState.isAvailable) {
+      throw AiProviderException(
+        AiProviderFailureKind.missingCredential,
+        'Provider token storage is unavailable.',
+      );
+    }
+
+    final token = await _readToken();
+    if (token == null || token.trim().isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.missingCredential,
+        'Provider token is missing.',
+      );
+    }
+
+    final settings = configuration.settings.normalized();
+    final boundary = routeAiChatSafetyBoundary(prompt);
+    if (boundary != AiChatSafetyBoundary.none) {
+      return AiChatResponse(
+        safetyBoundary: boundary,
+        message: _safetyResponse(boundary, context),
+      );
+    }
+
+    return switch (settings.provider) {
+      AiProvider.openai => _sendOpenAi(
+        token: token.trim(),
+        prompt: prompt,
+        context: context,
+        history: history,
+        model: settings.model,
+      ),
+      AiProvider.anthropic => _sendAnthropic(
+        token: token.trim(),
+        prompt: prompt,
+        context: context,
+        history: history,
+        model: settings.model,
+      ),
+      AiProvider.mock => const MockAiChatAdapter().sendMessage(
+        prompt: prompt,
+        context: context,
+        history: history,
+      ),
+    };
+  }
+
+  Future<String?> _readToken() async {
+    try {
+      return await readToken();
+    } catch (_) {
+      throw AiProviderException(
+        AiProviderFailureKind.providerUnavailable,
+        'Provider token storage could not be read.',
+      );
+    }
+  }
+
+  Future<AiChatResponse> _sendOpenAi({
+    required String token,
+    required String prompt,
+    required AiChatContext context,
+    required List<AiChatMessage> history,
+    required String model,
+  }) async {
+    final requestBody = jsonEncode({
+      'model': model,
+      'messages': [
+        {'role': 'system', 'content': _systemPrompt(context)},
+        for (final message in _requestHistory(prompt, history))
+          {
+            'role': message.isUser ? 'user' : 'assistant',
+            'content': message.content,
+          },
+        {'role': 'user', 'content': prompt.trim()},
+      ],
+      'temperature': 0.3,
+    });
+
+    final response = await _postProvider(
+      uri: Uri.https('api.openai.com', '/v1/chat/completions'),
+      headers: {
+        HttpHeaders.authorizationHeader: 'Bearer $token',
+        HttpHeaders.contentTypeHeader: 'application/json',
+      },
+      body: requestBody,
+    );
+    final body = _decodeResponseMap(response.body);
+    final choices = body['choices'];
+    if (choices is! List || choices.isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.malformedResponse,
+        'OpenAI response did not include choices.',
+      );
+    }
+    final first = _asObjectMap(choices.first);
+    final message = _asObjectMap(first?['message']);
+    final content = message?['content'];
+    if (content is! String || content.trim().isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.malformedResponse,
+        'OpenAI response did not include message content.',
+      );
+    }
+    return AiChatResponse(message: content.trim());
+  }
+
+  Future<AiChatResponse> _sendAnthropic({
+    required String token,
+    required String prompt,
+    required AiChatContext context,
+    required List<AiChatMessage> history,
+    required String model,
+  }) async {
+    final messages = [
+      for (final message in _requestHistory(prompt, history))
+        {
+          'role': message.isUser ? 'user' : 'assistant',
+          'content': message.content,
+        },
+      {'role': 'user', 'content': prompt.trim()},
+    ];
+    final requestBody = jsonEncode({
+      'model': model,
+      'max_tokens': 500,
+      'system': _systemPrompt(context),
+      'messages': messages,
+    });
+
+    final response = await _postProvider(
+      uri: Uri.https('api.anthropic.com', '/v1/messages'),
+      headers: {
+        'x-api-key': token,
+        'anthropic-version': '2023-06-01',
+        HttpHeaders.contentTypeHeader: 'application/json',
+      },
+      body: requestBody,
+    );
+    final body = _decodeResponseMap(response.body);
+    final content = body['content'];
+    if (content is! List || content.isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.malformedResponse,
+        'Anthropic response did not include content.',
+      );
+    }
+    final textParts = content
+        .map(_asObjectMap)
+        .nonNulls
+        .where((part) => part['type'] == 'text')
+        .map((part) => part['text'])
+        .whereType<String>()
+        .map((text) => text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList(growable: false);
+    if (textParts.isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.malformedResponse,
+        'Anthropic response did not include text content.',
+      );
+    }
+    return AiChatResponse(message: textParts.join('\n\n'));
+  }
+
+  Future<AiProviderTransportResponse> _postProvider({
+    required Uri uri,
+    required Map<String, String> headers,
+    required String body,
+  }) async {
+    try {
+      final response = await transport.post(
+        uri: uri,
+        headers: headers,
+        body: body,
+      );
+      _throwForStatus(response.statusCode);
+      return response;
+    } on TimeoutException {
+      throw AiProviderException(
+        AiProviderFailureKind.timeout,
+        'Provider request timed out.',
+      );
+    } on SocketException {
+      throw AiProviderException(
+        AiProviderFailureKind.providerUnavailable,
+        'Provider network is unavailable.',
+      );
+    } on AiProviderException {
+      rethrow;
+    } catch (_) {
+      throw AiProviderException(
+        AiProviderFailureKind.providerUnavailable,
+        'Provider request failed.',
+      );
+    }
+  }
+
+  void _throwForStatus(int statusCode) {
+    if (statusCode >= 200 && statusCode < 300) {
+      return;
+    }
+    if (statusCode == 401 || statusCode == 403) {
+      throw AiProviderException(
+        AiProviderFailureKind.missingCredential,
+        'Provider rejected the token.',
+      );
+    }
+    if (statusCode == 408 || statusCode == 504) {
+      throw AiProviderException(
+        AiProviderFailureKind.timeout,
+        'Provider request timed out.',
+      );
+    }
+    if (statusCode == 429) {
+      throw AiProviderException(
+        AiProviderFailureKind.rateLimited,
+        'Provider rate limit was reached.',
+      );
+    }
+    if (statusCode >= 500) {
+      throw AiProviderException(
+        AiProviderFailureKind.providerUnavailable,
+        'Provider service is unavailable.',
+      );
+    }
+    throw AiProviderException(
+      AiProviderFailureKind.providerError,
+      'Provider rejected the request.',
+    );
+  }
 }
 
 class MockAiChatAdapter implements AiChatAdapter {
@@ -146,4 +459,53 @@ String _normalize(String value) {
 
 bool _containsAny(String value, List<String> needles) {
   return needles.any(value.contains);
+}
+
+String _systemPrompt(AiChatContext context) {
+  return [
+    'You are a practical nutrition companion for general wellness support.',
+    'Do not diagnose, treat, or provide medical instructions.',
+    'Be concise, honest about uncertainty, and ask the user to confirm portions when nutrition is uncertain.',
+    'Current local context: ${buildAiChatContextSummary(context)}',
+  ].join('\n');
+}
+
+Map<String, Object?> _decodeResponseMap(String body) {
+  try {
+    final decoded = jsonDecode(body);
+    final mapped = _asObjectMap(decoded);
+    if (mapped != null) {
+      return mapped;
+    }
+  } on FormatException {
+    // Converted below to the domain provider failure type.
+  }
+  throw AiProviderException(
+    AiProviderFailureKind.malformedResponse,
+    'Provider returned malformed JSON.',
+  );
+}
+
+Map<String, Object?>? _asObjectMap(Object? value) {
+  if (value is! Map) {
+    return null;
+  }
+  return value.map((key, value) => MapEntry(key.toString(), value));
+}
+
+List<AiChatMessage> _requestHistory(
+  String prompt,
+  List<AiChatMessage> history,
+) {
+  final filtered = history
+      .where((message) => message.content.trim().isNotEmpty)
+      .toList(growable: false);
+  if (filtered.isEmpty) {
+    return const [];
+  }
+  final last = filtered.last;
+  if (last.isUser && last.content.trim() == prompt.trim()) {
+    return filtered.take(filtered.length - 1).toList(growable: false);
+  }
+  return filtered;
 }

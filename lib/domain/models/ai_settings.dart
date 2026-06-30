@@ -34,14 +34,14 @@ class AiProviderCatalog {
       label: 'OpenAI',
       models: ['gpt-4.1-mini', 'gpt-4.1'],
       requiresToken: true,
-      description: 'Stubbed real-provider mode until network calls are wired.',
+      description: 'Real-provider mode with your locally stored token.',
     ),
     AiProviderOption(
       provider: AiProvider.anthropic,
       label: 'Anthropic',
       models: ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest'],
       requiresToken: true,
-      description: 'Stubbed real-provider mode until network calls are wired.',
+      description: 'Real-provider mode with your locally stored token.',
     ),
   ];
 
@@ -166,7 +166,7 @@ class AiAdapterConfiguration {
   bool get canUseRealProvider =>
       settings.requiresToken && tokenState.hasToken && tokenState.isAvailable;
 
-  bool get shouldUseMock => settings.usesMockProvider || !canUseRealProvider;
+  bool get shouldUseMock => settings.usesMockProvider;
 
   String get providerLabel => settings.option.label;
 

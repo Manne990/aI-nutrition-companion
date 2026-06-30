@@ -128,15 +128,14 @@ required for local CI. App-owned FoodData Central keys must not ship in the
 mobile binary; a production app-owned key requires a future backend or proxy
 that keeps the secret server-side.
 
-Future AI provider work must not hard-code production API keys in the mobile
-app. User-provided tokens should be stored on device when secure platform
-storage is available, and mock AI should remain the default local development
-path until real provider configuration is implemented.
+AI provider calls must not hard-code production API keys in the mobile app.
+User-provided tokens are stored on device when secure platform storage is
+available, and mock AI remains the default local development path.
 
 Provider/model settings and local token storage are documented in
 [`docs/ai-provider-settings.md`](docs/ai-provider-settings.md). Mock AI remains
-the default for tests and local CI; real provider calls are still stubbed behind
-the adapter configuration.
+the default for tests and local CI; real provider chat calls use an injected
+transport with deterministic tests and require a user-owned saved token.
 
 ## Project Structure
 

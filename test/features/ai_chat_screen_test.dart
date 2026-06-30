@@ -63,6 +63,18 @@ const _configuration = AiAdapterConfiguration(
   ),
 );
 
+const _openAiMissingTokenConfiguration = AiAdapterConfiguration(
+  settings: AiProviderSettings(
+    provider: AiProvider.openai,
+    model: 'gpt-4.1-mini',
+  ),
+  tokenState: AiTokenState(
+    hasToken: false,
+    isSecureStorage: true,
+    storageLabel: 'test secure storage',
+  ),
+);
+
 void main() {
   testWidgets('renders empty chat state with today context and entry points', (
     tester,
@@ -143,6 +155,38 @@ void main() {
     expect(
       find.text(
         'Provider rate limit reached. Try again later, use mock AI, or keep planning manually.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('renders real provider missing-token recovery options', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        AiChatScreen(
+          profile: _profile(),
+          nutritionRepository: InMemoryNutritionRepository(),
+          chatRepository: InMemoryAiChatRepository(),
+          configuration: _openAiMissingTokenConfiguration,
+          adapter: RealProviderAiChatAdapter(
+            configuration: _openAiMissingTokenConfiguration,
+            readToken: () async => null,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'What should I eat next?');
+    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('What should I eat next?'), findsOneWidget);
+    expect(
+      find.text(
+        'Provider token missing. Update credentials, use mock AI, or keep planning manually.',
       ),
       findsOneWidget,
     );

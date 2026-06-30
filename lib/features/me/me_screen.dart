@@ -764,7 +764,7 @@ class _MeScreenState extends State<MeScreen> {
       return 'Mock AI is the default for tests and local CI. No token is required.';
     }
     if (tokenState.hasToken) {
-      return '${settings.option.label} is selected with ${settings.model}. Real calls remain stubbed behind the adapter until provider networking is added.';
+      return '${settings.option.label} is selected with ${settings.model}. Chat requests can be sent to the selected provider with your saved token.';
     }
     return '${settings.option.label} is selected with ${settings.model}. Add a token before real provider mode can be used.';
   }

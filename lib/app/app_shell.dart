@@ -14,6 +14,7 @@ import '../features/kitchen/kitchen_screen.dart';
 import '../features/me/me_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/today/today_screen.dart';
+import '../services/adapters/ai_chat_adapter.dart';
 import '../services/adapters/meal_recognition_adapter.dart';
 import '../services/adapters/nutrition_companion_adapter.dart';
 
@@ -146,6 +147,7 @@ class _AppShellState extends State<AppShell> {
                     repository: nutritionRepository,
                     chatRepository: widget.aiChatRepository,
                     aiConfiguration: aiConfiguration,
+                    aiChatAdapter: _createAiChatAdapter(aiConfiguration),
                     mealRecognitionAdapter: MockMealRecognitionAdapter(
                       configuration: aiConfiguration,
                     ),
@@ -268,6 +270,16 @@ class _AppShellState extends State<AppShell> {
     return SharedPreferencesNutritionRepository.create(
       seedGoal: profile.toNutritionGoal(calories: 2200),
       seedPreferences: profile.toUserPreferences(),
+    );
+  }
+
+  AiChatAdapter _createAiChatAdapter(AiAdapterConfiguration configuration) {
+    if (configuration.settings.usesMockProvider) {
+      return const MockAiChatAdapter();
+    }
+    return RealProviderAiChatAdapter(
+      configuration: configuration,
+      readToken: widget.aiSettingsRepository.readProviderToken,
     );
   }
 }
