@@ -120,13 +120,13 @@ The V1 auth boundary is documented in
 implementation is mock local auth with signed-out use preserved; no Firebase,
 Supabase, OAuth, or backend credential is required for local development.
 
-The FoodData Central adapter contract reports an explicit missing-key fallback
-state until a user-provided or runtime-injected API key is available. The V1
+The FoodData Central adapter contract reports an explicit missing-configuration
+fallback state until a build or app runtime supplies a data.gov key. The V1
 mobile boundary parses production-shaped FoodData Central search payloads behind
 an injected client so tests stay deterministic and no live network call is
-required for local CI. App-owned FoodData Central keys must not ship in the
-mobile binary; a production app-owned key requires a future backend or proxy
-that keeps the secret server-side.
+required for local CI. Real FoodData Central keys must not be committed; a
+production shared key should move behind a future backend or proxy before wide
+release.
 
 AI provider calls must not hard-code production API keys in the mobile app.
 User-provided tokens are stored on device when secure platform storage is

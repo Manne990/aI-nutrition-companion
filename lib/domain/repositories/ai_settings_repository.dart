@@ -19,14 +19,6 @@ abstract interface class AiSettingsRepository {
 
   Future<String?> readProviderToken();
 
-  Future<FoodDataCentralKeyState> loadFoodDataCentralKeyState();
-
-  Future<String?> readFoodDataCentralKey();
-
-  Future<void> saveFoodDataCentralKey(String apiKey);
-
-  Future<void> deleteFoodDataCentralKey();
-
   Future<AiAdapterConfiguration> loadAdapterConfiguration();
 }
 
@@ -72,50 +64,16 @@ class FlutterSecureAiTokenStorage implements AiTokenStorage {
   }
 }
 
-class FlutterSecureFoodDataCentralKeyStorage implements AiTokenStorage {
-  const FlutterSecureFoodDataCentralKeyStorage([FlutterSecureStorage? storage])
-    : _storage = storage ?? const FlutterSecureStorage();
-
-  static const key = 'nutrition.fooddata_central.api_key.v1';
-
-  final FlutterSecureStorage _storage;
-
-  @override
-  bool get isSecureStorage => true;
-
-  @override
-  String get storageLabel => 'platform secure storage';
-
-  @override
-  Future<String?> readToken() {
-    return _storage.read(key: key);
-  }
-
-  @override
-  Future<void> writeToken(String token) {
-    return _storage.write(key: key, value: token);
-  }
-
-  @override
-  Future<void> deleteToken() {
-    return _storage.delete(key: key);
-  }
-}
-
 class SharedPreferencesAiSettingsRepository implements AiSettingsRepository {
   const SharedPreferencesAiSettingsRepository(
     this._preferences, {
     required this.tokenStorage,
-    AiTokenStorage? foodDataCentralKeyStorage,
-  }) : foodDataCentralKeyStorage =
-           foodDataCentralKeyStorage ??
-           const FlutterSecureFoodDataCentralKeyStorage();
+  });
 
   static const settingsKey = 'ai.provider.settings.v1';
 
   final SharedPreferences _preferences;
   final AiTokenStorage tokenStorage;
-  final AiTokenStorage foodDataCentralKeyStorage;
 
   static Future<SharedPreferencesAiSettingsRepository> create() async {
     final preferences = await SharedPreferences.getInstance();
@@ -192,51 +150,6 @@ class SharedPreferencesAiSettingsRepository implements AiSettingsRepository {
   }
 
   @override
-  Future<FoodDataCentralKeyState> loadFoodDataCentralKeyState() async {
-    try {
-      final apiKey = await foodDataCentralKeyStorage.readToken();
-      return FoodDataCentralKeyState(
-        hasKey: apiKey != null && apiKey.isNotEmpty,
-        isSecureStorage: foodDataCentralKeyStorage.isSecureStorage,
-        storageLabel: foodDataCentralKeyStorage.storageLabel,
-      );
-    } catch (error) {
-      return FoodDataCentralKeyState(
-        hasKey: false,
-        isSecureStorage: foodDataCentralKeyStorage.isSecureStorage,
-        storageLabel: foodDataCentralKeyStorage.storageLabel,
-        errorMessage: 'FoodData Central key storage is unavailable: $error',
-      );
-    }
-  }
-
-  @override
-  Future<String?> readFoodDataCentralKey() async {
-    try {
-      final apiKey = await foodDataCentralKeyStorage.readToken();
-      final trimmed = apiKey?.trim();
-      return trimmed == null || trimmed.isEmpty ? null : trimmed;
-    } on Object {
-      return null;
-    }
-  }
-
-  @override
-  Future<void> saveFoodDataCentralKey(String apiKey) async {
-    final trimmed = apiKey.trim();
-    if (trimmed.isEmpty) {
-      await deleteFoodDataCentralKey();
-      return;
-    }
-    await foodDataCentralKeyStorage.writeToken(trimmed);
-  }
-
-  @override
-  Future<void> deleteFoodDataCentralKey() {
-    return foodDataCentralKeyStorage.deleteToken();
-  }
-
-  @override
   Future<AiAdapterConfiguration> loadAdapterConfiguration() async {
     return AiAdapterConfiguration(
       settings: await loadSettings(),
@@ -277,18 +190,11 @@ class InMemoryAiSettingsRepository implements AiSettingsRepository {
   InMemoryAiSettingsRepository({
     AiProviderSettings settings = AiProviderSettings.defaults,
     AiTokenStorage? tokenStorage,
-    AiTokenStorage? foodDataCentralKeyStorage,
   }) : _settings = settings.normalized(),
-       _tokenStorage = tokenStorage ?? InMemoryAiTokenStorage(),
-       _foodDataCentralKeyStorage =
-           foodDataCentralKeyStorage ??
-           InMemoryAiTokenStorage(
-             storageLabel: 'in-memory FoodData Central key storage',
-           );
+       _tokenStorage = tokenStorage ?? InMemoryAiTokenStorage();
 
   AiProviderSettings _settings;
   final AiTokenStorage _tokenStorage;
-  final AiTokenStorage _foodDataCentralKeyStorage;
 
   @override
   Future<AiProviderSettings> loadSettings() async => _settings;
@@ -326,38 +232,6 @@ class InMemoryAiSettingsRepository implements AiSettingsRepository {
   @override
   Future<String?> readProviderToken() {
     return _tokenStorage.readToken();
-  }
-
-  @override
-  Future<FoodDataCentralKeyState> loadFoodDataCentralKeyState() async {
-    final apiKey = await _foodDataCentralKeyStorage.readToken();
-    return FoodDataCentralKeyState(
-      hasKey: apiKey != null && apiKey.isNotEmpty,
-      isSecureStorage: _foodDataCentralKeyStorage.isSecureStorage,
-      storageLabel: _foodDataCentralKeyStorage.storageLabel,
-    );
-  }
-
-  @override
-  Future<String?> readFoodDataCentralKey() async {
-    final apiKey = await _foodDataCentralKeyStorage.readToken();
-    final trimmed = apiKey?.trim();
-    return trimmed == null || trimmed.isEmpty ? null : trimmed;
-  }
-
-  @override
-  Future<void> saveFoodDataCentralKey(String apiKey) async {
-    final trimmed = apiKey.trim();
-    if (trimmed.isEmpty) {
-      await deleteFoodDataCentralKey();
-      return;
-    }
-    await _foodDataCentralKeyStorage.writeToken(trimmed);
-  }
-
-  @override
-  Future<void> deleteFoodDataCentralKey() {
-    return _foodDataCentralKeyStorage.deleteToken();
   }
 
   @override

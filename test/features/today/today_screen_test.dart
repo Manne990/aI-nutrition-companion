@@ -572,7 +572,17 @@ void main() {
     );
     expect(find.text('Banana snack'), findsOneWidget);
 
-    await tester.tap(find.text('Log').first);
+    final bananaSuggestion = find.ancestor(
+      of: find.text('Banana snack'),
+      matching: find.byType(DecoratedBox),
+    );
+    final bananaLogButton = find.descendant(
+      of: bananaSuggestion,
+      matching: find.widgetWithText(FilledButton, 'Log'),
+    );
+    await tester.ensureVisible(bananaLogButton);
+    await tester.pumpAndSettle();
+    await tester.tap(bananaLogButton);
     await tester.pumpAndSettle();
 
     expect(repository.meals(), hasLength(3));

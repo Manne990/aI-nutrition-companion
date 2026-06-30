@@ -20,7 +20,7 @@ void main() {
   });
 
   test(
-    'in-memory repository creates, updates, and deletes token state',
+    'in-memory repository creates updates and deletes token state',
     () async {
       final repository = InMemoryAiSettingsRepository();
       final defaultSettings = await repository.loadSettings();
@@ -48,33 +48,18 @@ void main() {
 
       await repository.deleteToken();
       expect((await repository.loadTokenState()).hasToken, isFalse);
-
-      expect((await repository.loadFoodDataCentralKeyState()).hasKey, isFalse);
-
-      await repository.saveFoodDataCentralKey(' entered nutrition value ');
-      expect((await repository.loadFoodDataCentralKeyState()).hasKey, isTrue);
-
-      await repository.saveFoodDataCentralKey('updated nutrition value');
-      expect((await repository.loadFoodDataCentralKeyState()).hasKey, isTrue);
-
-      await repository.deleteFoodDataCentralKey();
-      expect((await repository.loadFoodDataCentralKeyState()).hasKey, isFalse);
     },
   );
 
   test(
-    'shared preferences repository keeps settings separate from credentials',
+    'shared preferences repository keeps settings separate from provider token',
     () async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
       final tokenStorage = InMemoryAiTokenStorage();
-      final foodDataCentralKeyStorage = InMemoryAiTokenStorage(
-        storageLabel: 'in-memory nutrition key storage',
-      );
       final repository = SharedPreferencesAiSettingsRepository(
         preferences,
         tokenStorage: tokenStorage,
-        foodDataCentralKeyStorage: foodDataCentralKeyStorage,
       );
 
       await repository.saveSettings(
@@ -84,7 +69,6 @@ void main() {
         ),
       );
       await repository.saveToken('stored provider value');
-      await repository.saveFoodDataCentralKey('stored nutrition value');
 
       expect(
         preferences.getString(
@@ -99,22 +83,19 @@ void main() {
         isNot(contains('stored provider value')),
       );
       expect(
-        preferences
-            .getString(SharedPreferencesAiSettingsRepository.settingsKey)
-            .toString(),
-        isNot(contains('stored nutrition value')),
+        preferences.getString(
+          SharedPreferencesAiSettingsRepository.settingsKey,
+        ),
+        isNot(contains('FoodData')),
       );
       expect((await repository.loadTokenState()).hasToken, isTrue);
-      expect((await repository.loadFoodDataCentralKeyState()).hasKey, isTrue);
 
       final reloaded = SharedPreferencesAiSettingsRepository(
         preferences,
         tokenStorage: tokenStorage,
-        foodDataCentralKeyStorage: foodDataCentralKeyStorage,
       );
 
       expect((await reloaded.loadTokenState()).hasToken, isTrue);
-      expect((await reloaded.loadFoodDataCentralKeyState()).hasKey, isTrue);
     },
   );
 
@@ -196,45 +177,4 @@ void main() {
       expect(await repository.loadSettings(), AiProviderSettings.defaults);
     },
   );
-
-  test(
-    'shared preferences repository falls back when credential storage fails',
-    () async {
-      SharedPreferences.setMockInitialValues({});
-      final preferences = await SharedPreferences.getInstance();
-      final repository = SharedPreferencesAiSettingsRepository(
-        preferences,
-        tokenStorage: InMemoryAiTokenStorage(),
-        foodDataCentralKeyStorage: _ThrowingAiTokenStorage(),
-      );
-
-      final keyState = await repository.loadFoodDataCentralKeyState();
-
-      expect(keyState.hasKey, isFalse);
-      expect(keyState.isAvailable, isFalse);
-      expect(
-        keyState.errorMessage,
-        contains('FoodData Central key storage is unavailable'),
-      );
-    },
-  );
-}
-
-class _ThrowingAiTokenStorage implements AiTokenStorage {
-  @override
-  bool get isSecureStorage => true;
-
-  @override
-  String get storageLabel => 'broken secure storage';
-
-  @override
-  Future<String?> readToken() {
-    throw StateError('corrupted secure storage payload');
-  }
-
-  @override
-  Future<void> writeToken(String token) async {}
-
-  @override
-  Future<void> deleteToken() async {}
 }

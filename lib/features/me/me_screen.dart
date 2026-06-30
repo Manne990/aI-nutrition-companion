@@ -59,11 +59,8 @@ class _MeScreenState extends State<MeScreen> {
   late AuthAccountState _authState;
   late HealthConnectionState _healthState;
   final TextEditingController _tokenController = TextEditingController();
-  final TextEditingController _foodDataCentralKeyController =
-      TextEditingController();
   AiProviderSettings? _draftSettings;
   String? _statusMessage;
-  String? _credentialStatusMessage;
   String? _healthStatusMessage;
   String? _diagnosticsStatusMessage;
   String? _nutritionStatusMessage;
@@ -80,7 +77,6 @@ class _MeScreenState extends State<MeScreen> {
   @override
   void dispose() {
     _tokenController.dispose();
-    _foodDataCentralKeyController.dispose();
     super.dispose();
   }
 
@@ -98,14 +94,8 @@ class _MeScreenState extends State<MeScreen> {
   Future<_AiSettingsViewState> _loadAiSettings() async {
     final settings = await widget.aiSettingsRepository.loadSettings();
     final tokenState = await widget.aiSettingsRepository.loadTokenState();
-    final foodDataCentralKeyState = await widget.aiSettingsRepository
-        .loadFoodDataCentralKeyState();
     _draftSettings = settings;
-    return _AiSettingsViewState(
-      settings: settings,
-      tokenState: tokenState,
-      foodDataCentralKeyState: foodDataCentralKeyState,
-    );
+    return _AiSettingsViewState(settings: settings, tokenState: tokenState);
   }
 
   @override
@@ -157,8 +147,6 @@ class _MeScreenState extends State<MeScreen> {
               children: [
                 _buildAiSettingsCard(context, viewState),
                 const SizedBox(height: 16),
-                _buildExternalCredentialsCard(context, viewState),
-                const SizedBox(height: 16),
                 _buildDiagnosticsCard(context, viewState),
               ],
             );
@@ -189,7 +177,7 @@ class _MeScreenState extends State<MeScreen> {
               const _DisclosureBullet(
                 icon: Icons.lock_outline,
                 text:
-                    'Provider tokens and FoodData Central keys stay on this device and are never shown again after saving.',
+                    'Provider tokens stay on this device and are never shown again after saving.',
               ),
               const _DisclosureBullet(
                 icon: Icons.cloud_off_outlined,
@@ -369,96 +357,6 @@ class _MeScreenState extends State<MeScreen> {
     );
   }
 
-  Widget _buildExternalCredentialsCard(
-    BuildContext context,
-    _AiSettingsViewState viewState,
-  ) {
-    final keyState = viewState.foodDataCentralKeyState;
-
-    return AppSectionCard(
-      title: 'External service credentials',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'FoodData Central can use a user-provided API key for direct lookup. Open Food Facts does not need credentials for the read path.',
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.xs,
-            runSpacing: AppSpacing.xs,
-            children: [
-              AppChip(
-                label: keyState.hasKey
-                    ? 'FoodData Central key saved'
-                    : 'No FoodData Central key',
-                icon: keyState.hasKey
-                    ? Icons.lock_outline
-                    : Icons.lock_open_outlined,
-                tone: keyState.hasKey
-                    ? AppChipTone.success
-                    : AppChipTone.neutral,
-              ),
-              AppChip(
-                label: keyState.isSecureStorage
-                    ? 'Secure local storage'
-                    : 'Storage fallback',
-                icon: Icons.security,
-                tone: keyState.isSecureStorage
-                    ? AppChipTone.success
-                    : AppChipTone.accent,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            key: const Key('fooddata-central-api-key-field'),
-            controller: _foodDataCentralKeyController,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'FoodData Central API key',
-              hintText: 'Paste key to save locally',
-              helperText: 'Saved keys are never shown again.',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppActionButtonGroup(
-            children: [
-              AppSecondaryButton(
-                label: keyState.hasKey
-                    ? 'Update FoodData Central key'
-                    : 'Save FoodData Central key',
-                icon: Icons.key,
-                onPressed: _saveFoodDataCentralKey,
-              ),
-              AppSecondaryButton(
-                label: 'Delete FoodData Central key',
-                icon: Icons.delete_outline,
-                onPressed: keyState.hasKey ? _deleteFoodDataCentralKey : null,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            keyState.errorMessage ??
-                'The FoodData Central key is stored separately from app preferences in ${keyState.storageLabel}. Delete key removes the local copy from this device.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
-          ),
-          if (_credentialStatusMessage != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            AppChip(
-              label: _credentialStatusMessage!,
-              icon: Icons.check_circle_outline,
-              tone: AppChipTone.success,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildHealthConnectionCard(BuildContext context) {
     final healthState = _healthState;
     final signalLabels = _signalLabels(healthState.signals);
@@ -610,7 +508,7 @@ class _MeScreenState extends State<MeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Copy a local support report with app version, provider modes, and high-level feature state. Tokens and API keys are never included.',
+            'Copy a local support report with app version, provider modes, and high-level feature state. Provider tokens are never included.',
           ),
           const SizedBox(height: AppSpacing.md),
           AppSecondaryButton(
@@ -644,7 +542,7 @@ class _MeScreenState extends State<MeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Confirmed meals and daily progress are stored on this device. Choose whether platform backup may include them.',
+            'Confirmed meals and daily progress are stored on this device. Choose whether platform backup may include them; resetting history does not change onboarding or provider tokens.',
           ),
           const SizedBox(height: AppSpacing.md),
           Wrap(
@@ -756,7 +654,6 @@ class _MeScreenState extends State<MeScreen> {
     await widget.onAiSettingsChanged();
     setState(() {
       _statusMessage = '${settings.option.label} ${settings.model} saved.';
-      _credentialStatusMessage = null;
       _aiSettingsFuture = _loadAiSettings();
     });
   }
@@ -774,7 +671,6 @@ class _MeScreenState extends State<MeScreen> {
     setState(() {
       _tokenController.clear();
       _statusMessage = 'Token saved locally.';
-      _credentialStatusMessage = null;
       _aiSettingsFuture = _loadAiSettings();
     });
   }
@@ -785,39 +681,6 @@ class _MeScreenState extends State<MeScreen> {
     setState(() {
       _tokenController.clear();
       _statusMessage = 'Token deleted from this device.';
-      _credentialStatusMessage = null;
-      _aiSettingsFuture = _loadAiSettings();
-    });
-  }
-
-  Future<void> _saveFoodDataCentralKey() async {
-    final apiKey = _foodDataCentralKeyController.text.trim();
-    if (apiKey.isEmpty) {
-      setState(() {
-        _credentialStatusMessage =
-            'Enter a FoodData Central key before saving.';
-        _statusMessage = null;
-      });
-      return;
-    }
-    await widget.aiSettingsRepository.saveFoodDataCentralKey(apiKey);
-    await widget.onAiSettingsChanged();
-    setState(() {
-      _foodDataCentralKeyController.clear();
-      _credentialStatusMessage = 'FoodData Central key saved locally.';
-      _statusMessage = null;
-      _aiSettingsFuture = _loadAiSettings();
-    });
-  }
-
-  Future<void> _deleteFoodDataCentralKey() async {
-    await widget.aiSettingsRepository.deleteFoodDataCentralKey();
-    await widget.onAiSettingsChanged();
-    setState(() {
-      _foodDataCentralKeyController.clear();
-      _credentialStatusMessage =
-          'FoodData Central key deleted from this device.';
-      _statusMessage = null;
       _aiSettingsFuture = _loadAiSettings();
     });
   }
@@ -867,7 +730,6 @@ class _MeScreenState extends State<MeScreen> {
       profile: widget.profile,
       aiSettings: viewState.settings,
       aiTokenState: viewState.tokenState,
-      foodDataCentralKeyState: viewState.foodDataCentralKeyState,
       authState: _authState,
       healthState: _healthState,
     );
@@ -966,12 +828,10 @@ class _AiSettingsViewState {
   const _AiSettingsViewState({
     required this.settings,
     required this.tokenState,
-    required this.foodDataCentralKeyState,
   });
 
   final AiProviderSettings settings;
   final AiTokenState tokenState;
-  final FoodDataCentralKeyState foodDataCentralKeyState;
 }
 
 class _DisclosureBullet extends StatelessWidget {

@@ -23,7 +23,6 @@ class AppDiagnosticsSnapshot {
     required this.profile,
     required this.aiSettings,
     required this.aiTokenState,
-    required this.foodDataCentralKeyState,
     required this.authState,
     required this.healthState,
   });
@@ -32,7 +31,6 @@ class AppDiagnosticsSnapshot {
   final OnboardingProfile profile;
   final AiProviderSettings aiSettings;
   final AiTokenState aiTokenState;
-  final FoodDataCentralKeyState foodDataCentralKeyState;
   final AuthAccountState authState;
   final HealthConnectionState healthState;
 
@@ -48,7 +46,7 @@ class AppDiagnosticsSnapshot {
     final lines = [
       '${config.appName} diagnostics',
       'App version: ${config.versionLabel}',
-      'Privacy: copied manually by the user; raw provider tokens and API keys are not included.',
+      'Privacy: copied manually by the user; raw provider tokens are not included.',
       '',
       'AI provider',
       '- Provider: ${aiSettings.option.label}',
@@ -57,9 +55,6 @@ class AppDiagnosticsSnapshot {
       '- AI token: ${_secretState(aiTokenState.hasToken)}',
       '- AI token storage: ${aiTokenState.storageLabel}',
       '- AI token storage available: ${_yesNo(aiTokenState.isAvailable)}',
-      '- FoodData Central key: ${_secretState(foodDataCentralKeyState.hasKey)}',
-      '- FoodData Central key storage: ${foodDataCentralKeyState.storageLabel}',
-      '- FoodData Central key storage available: ${_yesNo(foodDataCentralKeyState.isAvailable)}',
       '',
       'Account',
       '- Status: ${authState.statusLabel}',

@@ -35,11 +35,6 @@ void main() {
         isSecureStorage: true,
         storageLabel: 'test secure token storage sk-live-secret',
       ),
-      foodDataCentralKeyState: const FoodDataCentralKeyState(
-        hasKey: true,
-        isSecureStorage: true,
-        storageLabel: 'test secure key storage fdc-secret',
-      ),
       authState: const AuthAccountState(
         status: AuthConnectionStatus.providerUnavailable,
         provider: AuthProvider.supabase,
@@ -52,20 +47,18 @@ void main() {
     );
 
     final export = snapshot.exportText(
-      sensitiveValues: const ['sk-live-secret', 'fdc-secret'],
+      sensitiveValues: const ['sk-live-secret'],
     );
 
     expect(export, contains('App version: 9.8.7 (build 42)'));
     expect(export, contains('- Provider: OpenAI'));
     expect(export, contains('- Mode: OpenAI ready'));
     expect(export, contains('- AI token: saved (redacted)'));
-    expect(export, contains('- FoodData Central key: saved (redacted)'));
     expect(export, contains('- Provider: Supabase Auth'));
     expect(export, contains('- Enabled data types: Activity, Sleep'));
     expect(export, contains('- Dietary preference count: 2'));
     expect(export, contains('test secure token storage [redacted]'));
-    expect(export, contains('test secure key storage [redacted]'));
     expect(export, isNot(contains('sk-live-secret')));
-    expect(export, isNot(contains('fdc-secret')));
+    expect(export, isNot(contains('FoodData Central key')));
   });
 }
