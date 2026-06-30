@@ -39,6 +39,10 @@ enum NutritionLookupStatus {
   fallback,
   notFound,
   missingApiKey,
+  timeout,
+  rateLimited,
+  malformedResponse,
+  providerUnavailable,
   providerError,
 }
 
@@ -79,6 +83,10 @@ class NutritionLookupResult {
 
   bool get isProviderUnavailable =>
       status == NutritionLookupStatus.missingApiKey ||
+      status == NutritionLookupStatus.timeout ||
+      status == NutritionLookupStatus.rateLimited ||
+      status == NutritionLookupStatus.malformedResponse ||
+      status == NutritionLookupStatus.providerUnavailable ||
       status == NutritionLookupStatus.providerError;
 }
 

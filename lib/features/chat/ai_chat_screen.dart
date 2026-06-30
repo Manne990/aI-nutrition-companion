@@ -237,13 +237,22 @@ class _AiChatScreenState extends State<AiChatScreen> {
       });
       await widget.chatRepository.appendMessages([assistantMessage]);
       _scrollToBottom();
+    } on AiProviderException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSending = false;
+        _errorMessage = _providerFailureMessage(error.kind);
+      });
     } catch (error) {
       if (!mounted) {
         return;
       }
       setState(() {
         _isSending = false;
-        _errorMessage = 'Companion response unavailable. Try again.';
+        _errorMessage =
+            'Companion response unavailable. Try again, use mock AI, or keep planning manually.';
       });
     }
   }
@@ -509,5 +518,22 @@ String _safetyLabel(AiChatSafetyBoundary boundary) {
     AiChatSafetyBoundary.eatingDisorder => 'Safety boundary',
     AiChatSafetyBoundary.uncertainty => 'Uncertain estimate',
     AiChatSafetyBoundary.none => 'Companion answer',
+  };
+}
+
+String _providerFailureMessage(AiProviderFailureKind kind) {
+  return switch (kind) {
+    AiProviderFailureKind.missingCredential =>
+      'Provider token missing. Update credentials, use mock AI, or keep planning manually.',
+    AiProviderFailureKind.timeout =>
+      'Provider timed out. Try again, use mock AI, or keep planning manually.',
+    AiProviderFailureKind.rateLimited =>
+      'Provider rate limit reached. Try again later, use mock AI, or keep planning manually.',
+    AiProviderFailureKind.malformedResponse =>
+      'Provider response was unreadable. Try again, use mock AI, or keep planning manually.',
+    AiProviderFailureKind.providerUnavailable =>
+      'Provider unavailable. Try again, use mock AI, or keep planning manually.',
+    AiProviderFailureKind.providerError =>
+      'Companion response unavailable. Try again, use mock AI, or keep planning manually.',
   };
 }

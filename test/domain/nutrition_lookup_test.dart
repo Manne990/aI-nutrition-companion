@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
 import 'package:ai_nutrition_companion/domain/services/nutrition_lookup_service.dart';
@@ -129,7 +131,7 @@ void main() {
           ),
         );
 
-        expect(result.status, NutritionLookupStatus.providerError);
+        expect(result.status, NutritionLookupStatus.malformedResponse);
         expect(result.food, isNull);
         expect(result.message, contains('malformed nutrition data'));
       },
@@ -144,9 +146,28 @@ void main() {
         const NutritionLookupQuery(foodName: 'skyr', barcode: '1234567890123'),
       );
 
-      expect(result.status, NutritionLookupStatus.providerError);
+      expect(result.status, NutritionLookupStatus.providerUnavailable);
       expect(result.isProviderUnavailable, isTrue);
       expect(result.message, contains('lookup failed'));
+    });
+
+    test('Open Food Facts adapter reports rate limits', () async {
+      final provider = OpenFoodFactsNutritionProvider(
+        transport: _FakeOpenFoodFactsTransport(
+          response: const OpenFoodFactsTransportResponse(
+            statusCode: 429,
+            body: '{"error":"too many requests"}',
+          ),
+        ),
+      );
+
+      final result = await provider.lookup(
+        const NutritionLookupQuery(foodName: 'skyr', barcode: '1234567890123'),
+      );
+
+      expect(result.status, NutritionLookupStatus.rateLimited);
+      expect(result.isProviderUnavailable, isTrue);
+      expect(result.message, contains('rate limit'));
     });
 
     test(
@@ -244,11 +265,41 @@ void main() {
         const NutritionLookupQuery(foodName: 'salmon'),
       );
 
-      expect(result.status, NutritionLookupStatus.providerError);
+      expect(result.status, NutritionLookupStatus.providerUnavailable);
       expect(result.providerName, 'fooddata-central');
       expect(result.message, contains('FoodData Central lookup failed'));
       expect(result.message, isNot(contains('user-owned-test-key')));
     });
+
+    test(
+      'FoodData Central adapter distinguishes timeout and rate limit',
+      () async {
+        final timeoutProvider = FoodDataCentralNutritionProvider(
+          apiKey: 'user-owned-test-key',
+          client: _FakeFoodDataCentralSearchClient(
+            failure: TimeoutException('simulated timeout'),
+          ),
+        );
+        final rateLimitProvider = FoodDataCentralNutritionProvider(
+          apiKey: 'user-owned-test-key',
+          client: _FakeFoodDataCentralSearchClient(
+            failure: const FoodDataCentralRateLimitException(),
+          ),
+        );
+
+        final timeout = await timeoutProvider.lookup(
+          const NutritionLookupQuery(foodName: 'salmon'),
+        );
+        final rateLimit = await rateLimitProvider.lookup(
+          const NutritionLookupQuery(foodName: 'salmon'),
+        );
+
+        expect(timeout.status, NutritionLookupStatus.timeout);
+        expect(timeout.message, contains('timed out'));
+        expect(rateLimit.status, NutritionLookupStatus.rateLimited);
+        expect(rateLimit.message, contains('rate limit'));
+      },
+    );
   });
 
   group('NutritionEnrichmentService', () {
@@ -318,6 +369,37 @@ void main() {
       expect(result.message, contains('fooddata-central lookup timed out'));
       expect(result.food?.source.source, NutritionSource.fallback);
     });
+
+    test(
+      'returns a specific provider failure when no fallback is available',
+      () async {
+        final service = NutritionEnrichmentService(
+          providers: [
+            _ScriptedNutritionLookupProvider(
+              providerName: 'fooddata-central',
+              delay: const Duration(milliseconds: 50),
+              result: const NutritionLookupResult(
+                query: NutritionLookupQuery(foodName: 'unknown'),
+                status: NutritionLookupStatus.verified,
+                providerName: 'fooddata-central',
+                food: _foodDataCentralSalmon,
+              ),
+            ),
+          ],
+          fallbackProvider: LocalNutritionLookupProvider(foods: const []),
+          policy: const NutritionLookupPolicy(
+            providerTimeout: Duration(milliseconds: 1),
+          ),
+        );
+
+        final result = await service.lookupFood(
+          const NutritionLookupQuery(foodName: 'unknown'),
+        );
+
+        expect(result.status, NutritionLookupStatus.timeout);
+        expect(result.message, contains('timed out'));
+      },
+    );
 
     test('uses cached provider nutrition with preserved provenance', () async {
       final observedAt = DateTime.utc(2026, 6, 30, 9);

@@ -6,6 +6,25 @@ enum AiChatRole { user, assistant }
 
 enum AiChatSafetyBoundary { none, medical, eatingDisorder, uncertainty }
 
+enum AiProviderFailureKind {
+  missingCredential,
+  timeout,
+  rateLimited,
+  malformedResponse,
+  providerUnavailable,
+  providerError,
+}
+
+class AiProviderException implements Exception {
+  const AiProviderException(this.kind, this.message);
+
+  final AiProviderFailureKind kind;
+  final String message;
+
+  @override
+  String toString() => 'AiProviderException(${kind.name}): $message';
+}
+
 class AiChatMessage {
   const AiChatMessage({
     required this.id,

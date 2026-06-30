@@ -232,7 +232,7 @@ void main() {
             ),
             (query) => NutritionLookupResult(
               query: query,
-              status: NutritionLookupStatus.providerError,
+              status: NutritionLookupStatus.malformedResponse,
               providerName: 'open-food-facts',
               message: 'Open Food Facts returned malformed nutrition data.',
             ),
@@ -287,7 +287,7 @@ void main() {
         find.text('Open Food Facts returned malformed nutrition data.'),
         findsOneWidget,
       );
-      expect(find.text('Provider unavailable'), findsOneWidget);
+      expect(find.text('Provider data malformed'), findsOneWidget);
 
       await tester.enterText(find.byType(TextField), '222');
       await tester.tap(find.text('Look up package'));
