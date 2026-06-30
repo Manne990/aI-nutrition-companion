@@ -59,7 +59,7 @@ class HealthAuthorizationResult {
   static const denied = HealthAuthorizationResult(
     status: HealthAuthorizationStatus.denied,
     grantedTypes: {},
-    message: 'Permission was denied by the mock provider.',
+    message: 'Permission was denied.',
   );
 }
 
@@ -68,11 +68,11 @@ class MockHealthDataProvider implements HealthDataProvider {
     this.availability = const HealthPlatformAvailability(
       isAvailable: true,
       supportedTypes: HealthConnectionState.mvpTypes,
-      message: 'Mock health provider is available for development.',
+      message: 'Health connection is available for this build.',
     ),
     this.authorizationResult,
     this.signals = HealthSignalSnapshot.mock,
-    this.providerLabel = 'Mock health provider',
+    this.providerLabel = 'Platform Health',
   });
 
   final HealthPlatformAvailability availability;

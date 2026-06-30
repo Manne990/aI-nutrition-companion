@@ -359,10 +359,6 @@ class _MeScreenState extends State<MeScreen> {
 
   Widget _buildHealthConnectionCard(BuildContext context) {
     final healthState = _healthState;
-    final signalLabels = _signalLabels(healthState.signals);
-    final enabledLabels = healthState.enabledTypes
-        .map((type) => type.label)
-        .toList(growable: false);
 
     return AppSectionCard(
       title: 'Health connection',
@@ -389,13 +385,6 @@ class _MeScreenState extends State<MeScreen> {
                 icon: _healthStatusIcon(healthState.status),
                 tone: _healthStatusTone(healthState.status),
               ),
-              AppChip(
-                label: healthState.providerLabel,
-                icon: Icons.health_and_safety_outlined,
-              ),
-              for (final label in enabledLabels)
-                AppChip(label: label, icon: Icons.check_circle_outline),
-              for (final label in signalLabels) AppChip(label: label),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -777,34 +766,21 @@ String _weightCountLabel(int count) {
   return count == 1 ? '1 weight entry' : '$count weight entries';
 }
 
-List<String> _signalLabels(HealthSignalSnapshot? signals) {
-  if (signals == null || !signals.hasSignals) {
-    return const [];
-  }
-  return [
-    if (signals.weightKg != null) '${signals.weightKg!.toStringAsFixed(1)} kg',
-    if (signals.activeMinutes != null) '${signals.activeMinutes} min active',
-    if (signals.workoutCount != null) '${signals.workoutCount} workout',
-    if (signals.sleepHours != null)
-      '${signals.sleepHours!.toStringAsFixed(1)}h sleep',
-  ];
-}
-
 IconData _healthStatusIcon(HealthConnectionStatus status) {
   return switch (status) {
     HealthConnectionStatus.connected => Icons.check_circle_outline,
-    HealthConnectionStatus.disconnected => Icons.radio_button_unchecked,
-    HealthConnectionStatus.denied => Icons.block,
-    HealthConnectionStatus.unavailable => Icons.error_outline,
+    HealthConnectionStatus.disconnected ||
+    HealthConnectionStatus.denied ||
+    HealthConnectionStatus.unavailable => Icons.radio_button_unchecked,
   };
 }
 
 AppChipTone _healthStatusTone(HealthConnectionStatus status) {
   return switch (status) {
     HealthConnectionStatus.connected => AppChipTone.success,
-    HealthConnectionStatus.disconnected => AppChipTone.neutral,
-    HealthConnectionStatus.denied => AppChipTone.accent,
-    HealthConnectionStatus.unavailable => AppChipTone.accent,
+    HealthConnectionStatus.disconnected ||
+    HealthConnectionStatus.denied ||
+    HealthConnectionStatus.unavailable => AppChipTone.neutral,
   };
 }
 

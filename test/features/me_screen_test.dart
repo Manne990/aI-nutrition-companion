@@ -365,7 +365,7 @@ void main() {
     expect(clipboard.text, isNot(contains('FoodData Central key')));
   });
 
-  testWidgets('health connection starts disconnected until user intent', (
+  testWidgets('health connection starts not connected until user intent', (
     tester,
   ) async {
     final aiRepository = InMemoryAiSettingsRepository();
@@ -373,14 +373,14 @@ void main() {
     await _pumpMe(tester, aiRepository);
     await _scrollUntilVisible(tester, find.text('Health connection'));
 
-    expect(find.text('Disconnected'), findsOneWidget);
+    expect(find.text('Not connected'), findsOneWidget);
     expect(find.textContaining('until you choose Connect'), findsOneWidget);
     expect(find.text('Connect health'), findsOneWidget);
+    expect(find.textContaining('mock health'), findsNothing);
+    expect(find.text('Platform Health'), findsNothing);
   });
 
-  testWidgets('user can connect and disconnect mock health signals', (
-    tester,
-  ) async {
+  testWidgets('user can connect and disconnect Health state', (tester) async {
     final aiRepository = InMemoryAiSettingsRepository();
     final healthRepository = InMemoryHealthRepository();
 
@@ -394,17 +394,18 @@ void main() {
       HealthConnectionStatus.connected,
     );
     expect(find.text('Connected'), findsOneWidget);
-    expect(find.text('6.8h sleep'), findsOneWidget);
+    expect(find.text('6.8h sleep'), findsNothing);
+    expect(find.text('Sleep'), findsNothing);
     expect(find.text('Disconnect health'), findsOneWidget);
 
     await tester.tap(find.text('Disconnect health'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Disconnected'), findsOneWidget);
+    expect(find.text('Not connected'), findsOneWidget);
     expect(find.text('Health connection disconnected.'), findsOneWidget);
   });
 
-  testWidgets('health denied and unavailable states are visible', (
+  testWidgets('health denied and unavailable states stay not connected', (
     tester,
   ) async {
     final aiRepository = InMemoryAiSettingsRepository();
@@ -416,8 +417,9 @@ void main() {
     );
 
     await _pumpMe(tester, aiRepository, healthState: deniedState);
-    await _scrollUntilVisible(tester, find.text('Permission denied'));
+    await _scrollUntilVisible(tester, find.text('Not connected'));
 
+    expect(find.text('Permission denied'), findsNothing);
     expect(find.textContaining('change permission'), findsOneWidget);
 
     final unavailableState = const HealthConnectionState(
@@ -428,8 +430,9 @@ void main() {
     );
 
     await _pumpMe(tester, aiRepository, healthState: unavailableState);
-    await _scrollUntilVisible(tester, find.text('Unavailable'));
+    await _scrollUntilVisible(tester, find.text('Not connected'));
 
+    expect(find.text('Unavailable'), findsNothing);
     expect(find.textContaining('not available in this build'), findsOneWidget);
     final button = tester.widget<FilledButton>(
       find.widgetWithText(FilledButton, 'Connect health'),

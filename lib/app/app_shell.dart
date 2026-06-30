@@ -210,10 +210,15 @@ class _AppShellState extends State<AppShell> {
     await widget.onboardingRepository.saveProfile(profile);
     final nutritionRepository = await _loadNutritionRepository(profile);
     await nutritionRepository.saveBackupPreference(profile.backupPreference);
+    final healthState = profile.healthConnectionApproved
+        ? await widget.healthRepository.requestConnection()
+        : await widget.healthRepository.loadState();
     setState(() {
       _profile = profile;
       _selectedIndex = 0;
       _profileFuture = Future.value(profile);
+      _healthStateFuture = Future.value(healthState);
+      _runtimeStateFuture = _loadRuntimeState();
       _nutritionRepositoryProfile = profile;
       _nutritionRepositoryFuture = Future.value(nutritionRepository);
     });

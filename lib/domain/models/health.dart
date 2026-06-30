@@ -69,7 +69,7 @@ class HealthConnectionState {
     required this.enabledTypes,
     this.signals,
     this.statusDetail,
-    this.providerLabel = 'Mock health provider',
+    this.providerLabel = 'Platform Health',
   });
 
   final HealthConnectionStatus status;
@@ -90,7 +90,7 @@ class HealthConnectionState {
     status: HealthConnectionStatus.disconnected,
     supportedTypes: mvpTypes,
     enabledTypes: {},
-    providerLabel: 'Mock health provider',
+    providerLabel: 'Platform Health',
   );
 
   bool get isConnected => status == HealthConnectionStatus.connected;
@@ -100,22 +100,17 @@ class HealthConnectionState {
       status == HealthConnectionStatus.denied;
 
   String get statusLabel {
-    return switch (status) {
-      HealthConnectionStatus.connected => 'Connected',
-      HealthConnectionStatus.disconnected => 'Disconnected',
-      HealthConnectionStatus.denied => 'Permission denied',
-      HealthConnectionStatus.unavailable => 'Unavailable',
-    };
+    return isConnected ? 'Connected' : 'Not connected';
   }
 
   String get explainer {
     return switch (status) {
       HealthConnectionStatus.connected =>
-        'Selected health signals can now inform mock meal suggestions. Disconnect removes this app connection state.',
+        'Health connection is approved and can provide optional nutrition context.',
       HealthConnectionStatus.disconnected =>
         'Health connection is optional. The app works with manual and local nutrition data until you choose Connect.',
       HealthConnectionStatus.denied =>
-        'Health permission was denied. Keep using manual logging or change permission in platform settings before trying again.',
+        'Health connection is not approved. Keep using manual logging or change permission in platform settings before trying again.',
       HealthConnectionStatus.unavailable =>
         'Health connection is not available in this build or on this platform. Manual and local nutrition data still work.',
     };
