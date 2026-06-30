@@ -1,6 +1,7 @@
 import 'package:ai_nutrition_companion/app/theme/app_theme.dart';
 import 'package:ai_nutrition_companion/domain/models/ai_settings.dart';
 import 'package:ai_nutrition_companion/domain/models/auth.dart';
+import 'package:ai_nutrition_companion/domain/models/diagnostics.dart';
 import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
@@ -37,6 +38,9 @@ Future<void> _pumpMe(
   AuthAccountState authState = AuthAccountState.signedOut,
   InMemoryHealthRepository? healthRepository,
   HealthConnectionState healthState = HealthConnectionState.disconnected,
+  AppDiagnosticsConfig diagnosticsConfig = const AppDiagnosticsConfig(),
+  DiagnosticsClipboard diagnosticsClipboard =
+      const SystemDiagnosticsClipboard(),
 }) async {
   final effectiveAuthRepository =
       authRepository ?? InMemoryAuthRepository(initialState: authState);
@@ -55,6 +59,8 @@ Future<void> _pumpMe(
         onAuthStateChanged: () async {},
         onHealthStateChanged: () async {},
         onResetOnboarding: () async {},
+        diagnosticsConfig: diagnosticsConfig,
+        diagnosticsClipboard: diagnosticsClipboard,
       ),
     ),
   );
@@ -262,6 +268,54 @@ void main() {
     );
   });
 
+  testWidgets('user can copy redacted diagnostics from Me', (tester) async {
+    final aiTokenStorage = InMemoryAiTokenStorage();
+    final foodDataCentralKeyStorage = InMemoryAiTokenStorage(
+      storageLabel: 'test FoodData Central key storage',
+    );
+    final repository = InMemoryAiSettingsRepository(
+      settings: const AiProviderSettings(
+        provider: AiProvider.openai,
+        model: 'gpt-4.1-mini',
+      ),
+      tokenStorage: aiTokenStorage,
+      foodDataCentralKeyStorage: foodDataCentralKeyStorage,
+    );
+    await repository.saveToken('sk-test-secret');
+    await repository.saveFoodDataCentralKey('fdc-test-secret');
+    final clipboard = _FakeDiagnosticsClipboard();
+
+    await _pumpMe(
+      tester,
+      repository,
+      diagnosticsConfig: const AppDiagnosticsConfig(
+        versionName: '9.8.7',
+        buildNumber: '42',
+      ),
+      diagnosticsClipboard: clipboard,
+    );
+    await _scrollUntilVisible(tester, find.text('Copy diagnostics'));
+    await tester.tap(find.text('Copy diagnostics'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Feedback and diagnostics'), findsOneWidget);
+    expect(
+      find.text('Diagnostics copied locally. Paste it only when you choose.'),
+      findsOneWidget,
+    );
+    expect(clipboard.text, contains('App version: 9.8.7 (build 42)'));
+    expect(clipboard.text, contains('- Provider: OpenAI'));
+    expect(clipboard.text, contains('- Model: gpt-4.1-mini'));
+    expect(clipboard.text, contains('- AI token: saved (redacted)'));
+    expect(
+      clipboard.text,
+      contains('- FoodData Central key: saved (redacted)'),
+    );
+    expect(clipboard.text, contains('- Onboarding complete: yes'));
+    expect(clipboard.text, isNot(contains('sk-test-secret')));
+    expect(clipboard.text, isNot(contains('fdc-test-secret')));
+  });
+
   testWidgets('health connection starts disconnected until user intent', (
     tester,
   ) async {
@@ -333,4 +387,13 @@ void main() {
     );
     expect(button.onPressed, isNull);
   });
+}
+
+class _FakeDiagnosticsClipboard implements DiagnosticsClipboard {
+  String? text;
+
+  @override
+  Future<void> copy(String text) async {
+    this.text = text;
+  }
 }
