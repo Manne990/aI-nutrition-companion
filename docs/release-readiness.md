@@ -356,6 +356,10 @@ later:
 
 ## Store Listing Metadata Checklist
 
+Detailed draft metadata, screenshot capture paths, review notes, and explicit
+privacy/support placeholders live in
+[`docs/store-metadata-screenshot-plan.md`](store-metadata-screenshot-plan.md).
+
 Prepare these assets before a production or public testing release:
 
 - App name: `AI Nutrition Companion` or final approved name.
