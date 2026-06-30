@@ -8,7 +8,14 @@ import 'persisted_json.dart';
 abstract interface class AuthRepository {
   Future<AuthAccountState> loadState();
 
-  Future<AuthAccountState> signInWithMock();
+  Future<LocalAccountRecord?> loadLocalAccount();
+
+  Future<AuthAccountState> registerLocalAccount({
+    required String email,
+    required String displayName,
+  });
+
+  Future<AuthSignInResult> signInLocalAccount({required String email});
 
   Future<AuthAccountState> signOut();
 
@@ -25,11 +32,11 @@ abstract interface class AuthProviderAdapter {
   Future<AuthAccountState> signOut();
 }
 
-class MockAuthProviderAdapter implements AuthProviderAdapter {
-  const MockAuthProviderAdapter();
+class LocalAuthProviderAdapter implements AuthProviderAdapter {
+  const LocalAuthProviderAdapter();
 
   @override
-  AuthProvider get provider => AuthProvider.mock;
+  AuthProvider get provider => AuthProvider.local;
 
   @override
   Future<AuthAccountState> currentState() async => AuthAccountState.signedOut;
@@ -38,10 +45,9 @@ class MockAuthProviderAdapter implements AuthProviderAdapter {
   Future<AuthAccountState> signIn() async {
     return const AuthAccountState(
       status: AuthConnectionStatus.signedIn,
-      provider: AuthProvider.mock,
-      userLabel: 'Local mock user',
-      statusDetail:
-          'Mock auth is local to this device and does not sync nutrition logs.',
+      provider: AuthProvider.local,
+      userLabel: 'Local user',
+      statusDetail: 'Signed in with a local account on this device.',
     );
   }
 
@@ -52,13 +58,16 @@ class MockAuthProviderAdapter implements AuthProviderAdapter {
 class SharedPreferencesAuthRepository implements AuthRepository {
   const SharedPreferencesAuthRepository(
     this._preferences, {
-    this.adapter = const MockAuthProviderAdapter(),
+    this.adapter = const LocalAuthProviderAdapter(),
+    this.now,
   });
 
   static const stateKey = 'auth.account.state.v1';
+  static const accountKey = 'auth.local.account.v1';
 
   final SharedPreferences _preferences;
   final AuthProviderAdapter adapter;
+  final DateTime Function()? now;
 
   static Future<SharedPreferencesAuthRepository> create() async {
     final preferences = await SharedPreferences.getInstance();
@@ -83,10 +92,75 @@ class SharedPreferencesAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AuthAccountState> signInWithMock() async {
-    final state = await const MockAuthProviderAdapter().signIn();
+  Future<LocalAccountRecord?> loadLocalAccount() async {
+    final rawAccount = _preferences.getString(accountKey);
+    if (rawAccount == null || rawAccount.isEmpty) {
+      return null;
+    }
+    final decoded = decodePersistedJsonMap(rawAccount);
+    if (decoded == null) {
+      return null;
+    }
+    try {
+      return LocalAccountRecord.fromJson(decoded);
+    } on TypeError {
+      return null;
+    }
+  }
+
+  @override
+  Future<AuthAccountState> registerLocalAccount({
+    required String email,
+    required String displayName,
+  }) async {
+    final account = LocalAccountRecord(
+      email: email,
+      displayName: displayName.trim().isEmpty ? 'Local user' : displayName,
+      createdAt: now?.call() ?? DateTime.now(),
+    );
+    await _preferences.setString(accountKey, jsonEncode(account.toJson()));
+    final state = AuthAccountState(
+      status: AuthConnectionStatus.signedIn,
+      provider: AuthProvider.local,
+      userLabel: account.displayName,
+      statusDetail: 'Signed in with ${account.normalizedEmail}.',
+    );
     await _saveState(state);
     return state;
+  }
+
+  @override
+  Future<AuthSignInResult> signInLocalAccount({required String email}) async {
+    final account = await loadLocalAccount();
+    final currentState = await loadState();
+    if (account == null) {
+      return AuthSignInResult.failure(
+        state: currentState.copyWith(
+          status: AuthConnectionStatus.signedOut,
+          provider: AuthProvider.local,
+          statusDetail: 'Register before signing in on this device.',
+        ),
+        message: 'No local account exists yet. Register first.',
+      );
+    }
+    if (account.normalizedEmail != normalizeAccountEmail(email)) {
+      return AuthSignInResult.failure(
+        state: currentState.copyWith(
+          status: AuthConnectionStatus.signedOut,
+          provider: AuthProvider.local,
+          statusDetail: 'Check the email used when registering on this device.',
+        ),
+        message: 'No local account matches that email.',
+      );
+    }
+    final state = AuthAccountState(
+      status: AuthConnectionStatus.signedIn,
+      provider: AuthProvider.local,
+      userLabel: account.displayName,
+      statusDetail: 'Signed in with ${account.normalizedEmail}.',
+    );
+    await _saveState(state);
+    return AuthSignInResult.success(state);
   }
 
   @override
@@ -118,17 +192,68 @@ class SharedPreferencesAuthRepository implements AuthRepository {
 class InMemoryAuthRepository implements AuthRepository {
   InMemoryAuthRepository({
     AuthAccountState initialState = AuthAccountState.signedOut,
-  }) : _state = initialState;
+    LocalAccountRecord? initialAccount,
+  }) : _state = initialState,
+       _account = initialAccount;
 
   AuthAccountState _state;
+  LocalAccountRecord? _account;
 
   @override
   Future<AuthAccountState> loadState() async => _state;
 
   @override
-  Future<AuthAccountState> signInWithMock() async {
-    _state = await const MockAuthProviderAdapter().signIn();
+  Future<LocalAccountRecord?> loadLocalAccount() async => _account;
+
+  @override
+  Future<AuthAccountState> registerLocalAccount({
+    required String email,
+    required String displayName,
+  }) async {
+    _account = LocalAccountRecord(
+      email: email,
+      displayName: displayName.trim().isEmpty ? 'Local user' : displayName,
+      createdAt: DateTime.now(),
+    );
+    _state = AuthAccountState(
+      status: AuthConnectionStatus.signedIn,
+      provider: AuthProvider.local,
+      userLabel: _account!.displayName,
+      statusDetail: 'Signed in with ${_account!.normalizedEmail}.',
+    );
     return _state;
+  }
+
+  @override
+  Future<AuthSignInResult> signInLocalAccount({required String email}) async {
+    final account = _account;
+    if (account == null) {
+      return AuthSignInResult.failure(
+        state: _state.copyWith(
+          status: AuthConnectionStatus.signedOut,
+          provider: AuthProvider.local,
+          statusDetail: 'Register before signing in on this device.',
+        ),
+        message: 'No local account exists yet. Register first.',
+      );
+    }
+    if (account.normalizedEmail != normalizeAccountEmail(email)) {
+      return AuthSignInResult.failure(
+        state: _state.copyWith(
+          status: AuthConnectionStatus.signedOut,
+          provider: AuthProvider.local,
+          statusDetail: 'Check the email used when registering on this device.',
+        ),
+        message: 'No local account matches that email.',
+      );
+    }
+    _state = AuthAccountState(
+      status: AuthConnectionStatus.signedIn,
+      provider: AuthProvider.local,
+      userLabel: account.displayName,
+      statusDetail: 'Signed in with ${account.normalizedEmail}.',
+    );
+    return AuthSignInResult.success(_state);
   }
 
   @override

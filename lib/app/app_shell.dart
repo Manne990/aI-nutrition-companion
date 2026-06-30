@@ -10,6 +10,7 @@ import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/nutrition_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
+import '../features/account/account_entry_screen.dart';
 import '../features/kitchen/kitchen_screen.dart';
 import '../features/me/me_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
@@ -106,14 +107,6 @@ class _AppShellState extends State<AppShell> {
           );
         }
 
-        _profile ??= snapshot.data;
-        final profile = _profile;
-        if (profile == null) {
-          return OnboardingScreen(onCompleted: _completeOnboarding);
-        }
-
-        _ensureNutritionRepository(profile);
-
         return FutureBuilder<
           ({
             AiAdapterConfiguration ai,
@@ -134,6 +127,21 @@ class _AppShellState extends State<AppShell> {
             final aiConfiguration = runtimeSnapshot.requireData.ai;
             final authState = runtimeSnapshot.requireData.auth;
             final healthState = runtimeSnapshot.requireData.health;
+            if (!authState.isSignedIn) {
+              return AccountEntryScreen(
+                onSignIn: _signInLocalAccount,
+                onRegister: _registerLocalAccount,
+              );
+            }
+
+            _profile ??= snapshot.data;
+            final profile = _profile;
+            if (profile == null) {
+              return OnboardingScreen(onCompleted: _completeOnboarding);
+            }
+
+            _ensureNutritionRepository(profile);
+
             return FutureBuilder<NutritionRepository>(
               future: _nutritionRepositoryFuture,
               builder: (context, nutritionSnapshot) {
@@ -222,6 +230,33 @@ class _AppShellState extends State<AppShell> {
       _nutritionRepositoryProfile = profile;
       _nutritionRepositoryFuture = Future.value(nutritionRepository);
     });
+  }
+
+  Future<String?> _registerLocalAccount({
+    required String email,
+    required String displayName,
+  }) async {
+    final authState = await widget.authRepository.registerLocalAccount(
+      email: email,
+      displayName: displayName,
+    );
+    setState(() {
+      _authStateFuture = Future.value(authState);
+      _runtimeStateFuture = _loadRuntimeState();
+    });
+    return null;
+  }
+
+  Future<String?> _signInLocalAccount(String email) async {
+    final result = await widget.authRepository.signInLocalAccount(email: email);
+    if (!result.isSuccess) {
+      return result.errorMessage;
+    }
+    setState(() {
+      _authStateFuture = Future.value(result.state);
+      _runtimeStateFuture = _loadRuntimeState();
+    });
+    return null;
   }
 
   Future<void> _resetOnboarding() async {

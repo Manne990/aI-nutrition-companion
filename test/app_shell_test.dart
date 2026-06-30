@@ -1,5 +1,6 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
 import 'package:ai_nutrition_companion/app/service_credentials.dart';
+import 'package:ai_nutrition_companion/domain/models/auth.dart';
 import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
@@ -74,6 +75,7 @@ Future<void> _pumpApp(
   WidgetTester tester, {
   InMemoryOnboardingRepository? repository,
   AiSettingsRepository? aiSettingsRepository,
+  AuthRepository? authRepository,
   HealthRepository? healthRepository,
   NutritionRepository? nutritionRepository,
   FoodDataCentralSearchClient? foodDataCentralSearchClient,
@@ -87,7 +89,15 @@ Future<void> _pumpApp(
           repository ?? InMemoryOnboardingRepository(_profile()),
       aiSettingsRepository:
           aiSettingsRepository ?? InMemoryAiSettingsRepository(),
-      authRepository: InMemoryAuthRepository(),
+      authRepository:
+          authRepository ??
+          InMemoryAuthRepository(
+            initialState: const AuthAccountState(
+              status: AuthConnectionStatus.signedIn,
+              provider: AuthProvider.local,
+              userLabel: 'Returning user',
+            ),
+          ),
       healthRepository: healthRepository ?? InMemoryHealthRepository(),
       aiChatRepository: InMemoryAiChatRepository(),
       nutritionRepository: useDefaultNutritionRepository
@@ -123,6 +133,153 @@ Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  testWidgets('fresh launch shows account entry before product tabs', (
+    tester,
+  ) async {
+    await _pumpApp(
+      tester,
+      authRepository: InMemoryAuthRepository(),
+      repository: InMemoryOnboardingRepository(_profile()),
+    );
+
+    expect(find.text('Sign in'), findsWidgets);
+    expect(find.text('Register'), findsOneWidget);
+    expect(find.text('What should I eat next?'), findsNothing);
+    expect(find.text('Today'), findsNothing);
+    expect(find.text('Kitchen'), findsNothing);
+    expect(find.text('Me'), findsNothing);
+  });
+
+  testWidgets('sign in requires an existing local account', (tester) async {
+    await _pumpApp(
+      tester,
+      authRepository: InMemoryAuthRepository(),
+      repository: InMemoryOnboardingRepository(_profile()),
+    );
+
+    await tester.enterText(_textFieldWithLabel('Email'), 'person@example.com');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No local account exists yet. Register first.'),
+      findsOneWidget,
+    );
+    expect(find.text('What should I eat next?'), findsNothing);
+  });
+
+  testWidgets('sign in rejects credentials for a different local account', (
+    tester,
+  ) async {
+    final authRepository = InMemoryAuthRepository(
+      initialAccount: LocalAccountRecord(
+        email: 'saved@example.com',
+        displayName: 'Saved Person',
+        createdAt: DateTime(2026, 6, 29),
+      ),
+    );
+
+    await _pumpApp(
+      tester,
+      authRepository: authRepository,
+      repository: InMemoryOnboardingRepository(_profile()),
+    );
+
+    await tester.enterText(_textFieldWithLabel('Email'), 'wrong@example.com');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No local account matches that email.'), findsOneWidget);
+    expect(find.text('What should I eat next?'), findsNothing);
+  });
+
+  testWidgets('existing local account can sign in to product tabs', (
+    tester,
+  ) async {
+    final authRepository = InMemoryAuthRepository(
+      initialAccount: LocalAccountRecord(
+        email: 'saved@example.com',
+        displayName: 'Saved Person',
+        createdAt: DateTime(2026, 6, 29),
+      ),
+    );
+
+    await _pumpApp(
+      tester,
+      authRepository: authRepository,
+      repository: InMemoryOnboardingRepository(_profile()),
+    );
+
+    await tester.enterText(_textFieldWithLabel('Email'), 'saved@example.com');
+    await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('What should I eat next?'), findsOneWidget);
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Kitchen'), findsOneWidget);
+    expect(find.text('Me'), findsOneWidget);
+  });
+
+  testWidgets('register creates a local account and starts onboarding', (
+    tester,
+  ) async {
+    final authRepository = InMemoryAuthRepository();
+    final repository = InMemoryOnboardingRepository();
+
+    await _pumpApp(
+      tester,
+      authRepository: authRepository,
+      repository: repository,
+    );
+
+    await tester.tap(find.text('Register'));
+    await tester.pumpAndSettle();
+    await tester.enterText(_textFieldWithLabel('Email'), 'new@example.com');
+    await tester.enterText(_textFieldWithLabel('Name'), 'New Person');
+    await tester.tap(find.widgetWithText(FilledButton, 'Register'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set your direction'), findsOneWidget);
+    expect((await authRepository.loadState()).isSignedIn, isTrue);
+    expect(
+      (await authRepository.loadLocalAccount())?.normalizedEmail,
+      'new@example.com',
+    );
+  });
+
+  testWidgets('logout returns to account entry and blocks product tabs', (
+    tester,
+  ) async {
+    final authRepository = InMemoryAuthRepository(
+      initialState: const AuthAccountState(
+        status: AuthConnectionStatus.signedIn,
+        provider: AuthProvider.local,
+        userLabel: 'Signed User',
+      ),
+      initialAccount: LocalAccountRecord(
+        email: 'signed@example.com',
+        displayName: 'Signed User',
+        createdAt: DateTime(2026, 6, 29),
+      ),
+    );
+
+    await _pumpApp(
+      tester,
+      authRepository: authRepository,
+      repository: InMemoryOnboardingRepository(_profile()),
+    );
+
+    await tester.tap(find.byIcon(Icons.person_outline));
+    await tester.pumpAndSettle();
+    await _scrollUntilVisible(tester, find.text('Sign out'));
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI Nutrition Companion'), findsOneWidget);
+    expect(find.text('What should I eat next?'), findsNothing);
+    expect(find.text('Today'), findsNothing);
+  });
+
   testWidgets('returning user sees Today and bottom navigation', (
     tester,
   ) async {

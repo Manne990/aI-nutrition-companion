@@ -138,45 +138,54 @@ void main() {
       find.textContaining('AI and photo estimates can be wrong'),
       findsOneWidget,
     );
-    expect(
-      find.textContaining('V1 is local-first with signed-out use'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('V1 accounts are local'), findsOneWidget);
     expect(
       find.textContaining('Camera and health access stay off'),
       findsOneWidget,
     );
   });
 
-  testWidgets('account state starts signed out with mock auth boundary', (
+  testWidgets('account card shows signed-in local account boundary', (
     tester,
   ) async {
     final repository = InMemoryAiSettingsRepository();
+    const authState = AuthAccountState(
+      status: AuthConnectionStatus.signedIn,
+      provider: AuthProvider.local,
+      userLabel: 'Local Person',
+    );
 
-    await _pumpMe(tester, repository);
+    await _pumpMe(tester, repository, authState: authState);
     await _scrollUntilVisible(tester, find.text('Account'));
 
-    expect(find.text('Signed out'), findsOneWidget);
-    expect(find.text('Mock local auth'), findsOneWidget);
-    expect(find.text('Use mock account'), findsOneWidget);
-    expect(find.textContaining('Nutrition logs remain local'), findsOneWidget);
+    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text('Local account'), findsOneWidget);
+    expect(find.text('Local Person'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.textContaining('local to this device'), findsOneWidget);
   });
 
-  testWidgets('user can sign in and out of mock local auth', (tester) async {
+  testWidgets('user can sign out of local account from Me', (tester) async {
     final aiRepository = InMemoryAiSettingsRepository();
-    final authRepository = InMemoryAuthRepository();
-
-    await _pumpMe(tester, aiRepository, authRepository: authRepository);
-    await _scrollUntilVisible(tester, find.text('Use mock account'));
-    await tester.tap(find.text('Use mock account'));
-    await tester.pumpAndSettle();
-
-    expect(
-      (await authRepository.loadState()).status,
-      AuthConnectionStatus.signedIn,
+    final authRepository = InMemoryAuthRepository(
+      initialState: const AuthAccountState(
+        status: AuthConnectionStatus.signedIn,
+        provider: AuthProvider.local,
+        userLabel: 'Local Person',
+      ),
     );
-    expect(find.text('Signed in'), findsOneWidget);
-    expect(find.text('Local mock user'), findsOneWidget);
+
+    await _pumpMe(
+      tester,
+      aiRepository,
+      authRepository: authRepository,
+      authState: const AuthAccountState(
+        status: AuthConnectionStatus.signedIn,
+        provider: AuthProvider.local,
+        userLabel: 'Local Person',
+      ),
+    );
+    await _scrollUntilVisible(tester, find.text('Sign out'));
     expect(find.text('Sign out'), findsOneWidget);
 
     await tester.tap(find.text('Sign out'));
@@ -204,7 +213,7 @@ void main() {
 
     expect(find.text('Firebase Auth'), findsOneWidget);
     expect(find.textContaining('not configured'), findsWidgets);
-    expect(find.text('Use mock account'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
   });
 
   testWidgets('user can select provider and latest model is automatic', (
