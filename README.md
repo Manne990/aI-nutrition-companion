@@ -98,6 +98,12 @@ and the pre-submission test matrix.
 No environment variables are required for the default V1 local app. Nutrition
 lookup uses deterministic mock/local adapters unless a real provider is wired.
 
+Direct nutrition and auth provider architecture is documented in
+[`docs/direct-api-provider-architecture.md`](docs/direct-api-provider-architecture.md).
+V1 should prefer direct app integrations only when the provider contract is
+public, user-owned, or explicitly client-safe; app-owned secrets require a
+backend or proxy before production use.
+
 The FoodData Central adapter contract reports an explicit missing-key fallback
 state when `FOODDATA_CENTRAL_API_KEY` is absent. A future network-backed
 implementation should read that variable outside the mobile binary and must not
