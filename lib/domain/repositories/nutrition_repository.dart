@@ -43,6 +43,10 @@ abstract interface class NutritionRepository {
 
   Future<void> clearLocalProgress();
 
+  LocalDataBackupPreference backupPreference();
+
+  Future<void> saveBackupPreference(LocalDataBackupPreference preference);
+
   NutritionStorageStatus storageStatus();
 }
 
@@ -67,6 +71,7 @@ class InMemoryNutritionRepository implements NutritionRepository {
     List<WeightEntry>? seedWeightEntries,
     NutritionGoal? seedGoal,
     UserPreferences? seedPreferences,
+    LocalDataBackupPreference? seedBackupPreference,
     NutritionEnrichmentService? lookupService,
     String? foodDataCentralApiKey,
     FoodDataCentralSearchClient? foodDataCentralSearchClient,
@@ -77,6 +82,8 @@ class InMemoryNutritionRepository implements NutritionRepository {
        ),
        _goal = seedGoal ?? NutritionSeedData.goal,
        _preferences = seedPreferences ?? NutritionSeedData.preferences,
+       _backupPreference =
+           seedBackupPreference ?? LocalDataBackupPreference.localOnly,
        _lookupService =
            lookupService ??
            _defaultLookupService(
@@ -111,6 +118,7 @@ class InMemoryNutritionRepository implements NutritionRepository {
   final List<WeightEntry> _weightEntries;
   final NutritionGoal _goal;
   final UserPreferences _preferences;
+  LocalDataBackupPreference _backupPreference;
   final NutritionEnrichmentService _lookupService;
 
   @override
@@ -199,6 +207,16 @@ class InMemoryNutritionRepository implements NutritionRepository {
   }
 
   @override
+  LocalDataBackupPreference backupPreference() => _backupPreference;
+
+  @override
+  Future<void> saveBackupPreference(
+    LocalDataBackupPreference preference,
+  ) async {
+    _backupPreference = preference;
+  }
+
+  @override
   NutritionStorageStatus storageStatus() {
     return const NutritionStorageStatus(
       isPersistent: false,
@@ -215,6 +233,7 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     List<WeightEntry>? seedWeightEntries,
     NutritionGoal? seedGoal,
     UserPreferences? seedPreferences,
+    LocalDataBackupPreference? seedBackupPreference,
     NutritionEnrichmentService? lookupService,
     String? foodDataCentralApiKey,
     FoodDataCentralSearchClient? foodDataCentralSearchClient,
@@ -229,6 +248,11 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
       seedWeightEntries: persistedState?.weightEntries ?? seedWeightEntries,
       seedGoal: seedGoal,
       seedPreferences: seedPreferences,
+      seedBackupPreference:
+          _backupPreferenceFromRaw(
+            preferences.getString(backupPreferenceKey),
+          ) ??
+          seedBackupPreference,
       lookupService: lookupService,
       foodDataCentralApiKey: foodDataCentralApiKey,
       foodDataCentralSearchClient: foodDataCentralSearchClient,
@@ -242,12 +266,14 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     super.seedWeightEntries,
     super.seedGoal,
     super.seedPreferences,
+    super.seedBackupPreference,
     super.lookupService,
     super.foodDataCentralApiKey,
     super.foodDataCentralSearchClient,
   });
 
   static const stateKey = 'nutrition.state.v1';
+  static const backupPreferenceKey = 'nutrition.backupPreference.v1';
 
   final SharedPreferences _sharedPreferences;
   Future<void>? _pendingPersist;
@@ -259,6 +285,7 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     List<WeightEntry>? seedWeightEntries,
     NutritionGoal? seedGoal,
     UserPreferences? seedPreferences,
+    LocalDataBackupPreference? seedBackupPreference,
     NutritionEnrichmentService? lookupService,
     String? foodDataCentralApiKey,
     FoodDataCentralSearchClient? foodDataCentralSearchClient,
@@ -271,6 +298,7 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
       seedWeightEntries: seedWeightEntries,
       seedGoal: seedGoal,
       seedPreferences: seedPreferences,
+      seedBackupPreference: seedBackupPreference,
       lookupService: lookupService,
       foodDataCentralApiKey: foodDataCentralApiKey,
       foodDataCentralSearchClient: foodDataCentralSearchClient,
@@ -303,6 +331,20 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     _lastPersistenceError = removed
         ? null
         : 'Nutrition history could not be cleared locally.';
+  }
+
+  @override
+  Future<void> saveBackupPreference(
+    LocalDataBackupPreference preference,
+  ) async {
+    await super.saveBackupPreference(preference);
+    final saved = await _sharedPreferences.setString(
+      backupPreferenceKey,
+      preference.name,
+    );
+    _lastPersistenceError = saved
+        ? null
+        : 'Backup preference could not be saved locally.';
   }
 
   @override
@@ -341,6 +383,18 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
       }),
     );
   }
+}
+
+LocalDataBackupPreference? _backupPreferenceFromRaw(String? rawPreference) {
+  if (rawPreference == null || rawPreference.isEmpty) {
+    return null;
+  }
+  for (final preference in LocalDataBackupPreference.values) {
+    if (preference.name == rawPreference) {
+      return preference;
+    }
+  }
+  return null;
 }
 
 class _NutritionPersistenceState {

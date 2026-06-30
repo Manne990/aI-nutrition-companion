@@ -335,17 +335,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Consent boundaries'), findsOneWidget);
     expect(find.text('Start Today'), findsOneWidget);
+    await tester.tap(find.text('Allow backup'));
+    await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(CheckboxListTile).at(0));
-    await tester.tap(find.byType(CheckboxListTile).at(1));
-    await tester.tap(find.byType(CheckboxListTile).at(2));
+    await _scrollUntilVisible(
+      tester,
+      find.text('I understand nutrition guidance is not medical advice.'),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'I understand nutrition guidance is not medical advice.',
+      ),
+    );
+    await _scrollUntilVisible(
+      tester,
+      find.text('I understand AI meal and macro estimates may be uncertain.'),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'I understand AI meal and macro estimates may be uncertain.',
+      ),
+    );
+    await _scrollUntilVisible(
+      tester,
+      find.text(
+        'Camera, health, and token access stay off until I choose a feature that needs them.',
+      ),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'Camera, health, and token access stay off until I choose a feature that needs them.',
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Start Today'));
     await tester.pumpAndSettle();
 
     expect(find.text('What should I eat next?'), findsOneWidget);
-    expect((await repository.loadProfile())?.hasRequiredConsent, isTrue);
+    final profile = await repository.loadProfile();
+    expect(profile?.hasRequiredConsent, isTrue);
+    expect(
+      profile?.backupPreference,
+      LocalDataBackupPreference.platformBackupAllowed,
+    );
   });
 
   testWidgets(

@@ -3,6 +3,7 @@ import 'package:ai_nutrition_companion/domain/models/ai_settings.dart';
 import 'package:ai_nutrition_companion/domain/models/auth.dart';
 import 'package:ai_nutrition_companion/domain/models/diagnostics.dart';
 import 'package:ai_nutrition_companion/domain/models/health.dart';
+import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/auth_repository.dart';
@@ -318,8 +319,19 @@ void main() {
     );
 
     await _scrollUntilVisible(tester, find.text('Local nutrition data'));
+    expect(find.text('Local only'), findsWidgets);
     expect(find.text('2 meals'), findsOneWidget);
     expect(find.text('1 weight entry'), findsOneWidget);
+
+    await tester.tap(find.text('Allow backup'));
+    await tester.pumpAndSettle();
+
+    expect(
+      nutritionRepository.backupPreference(),
+      LocalDataBackupPreference.platformBackupAllowed,
+    );
+    expect(find.text('Platform backup allowed'), findsWidgets);
+    expect(find.text('Platform backup allowed saved.'), findsOneWidget);
 
     await _scrollUntilVisible(tester, find.text('Reset nutrition history'));
     await tester.tap(find.text('Reset nutrition history'));
@@ -333,6 +345,11 @@ void main() {
     );
     expect(find.text('0 meals'), findsOneWidget);
     expect(find.text('0 weight entries'), findsOneWidget);
+    expect(
+      nutritionRepository.backupPreference(),
+      LocalDataBackupPreference.platformBackupAllowed,
+    );
+    expect(find.text('Platform backup allowed'), findsWidgets);
   });
 
   testWidgets('user can copy redacted diagnostics from Me', (tester) async {

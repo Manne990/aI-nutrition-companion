@@ -9,6 +9,7 @@ class OnboardingProfile {
     required this.acceptedAiGuidanceDisclaimer,
     required this.acceptedPrivacyBoundary,
     required this.completedAt,
+    this.backupPreference = LocalDataBackupPreference.localOnly,
     this.targetWeightKg,
     this.dietaryPreferences = const [],
     this.allergies = const [],
@@ -26,6 +27,7 @@ class OnboardingProfile {
   final bool acceptedAiGuidanceDisclaimer;
   final bool acceptedPrivacyBoundary;
   final DateTime completedAt;
+  final LocalDataBackupPreference backupPreference;
 
   bool get hasRequiredConsent {
     return acceptedNutritionDisclaimer &&
@@ -60,6 +62,7 @@ class OnboardingProfile {
       'acceptedAiGuidanceDisclaimer': acceptedAiGuidanceDisclaimer,
       'acceptedPrivacyBoundary': acceptedPrivacyBoundary,
       'completedAt': completedAt.toIso8601String(),
+      'backupPreference': backupPreference.name,
     };
   }
 
@@ -82,8 +85,20 @@ class OnboardingProfile {
       completedAt:
           DateTime.tryParse(_string(json['completedAt'], fallback: '')) ??
           DateTime.fromMillisecondsSinceEpoch(0),
+      backupPreference: _backupPreference(json['backupPreference']),
     );
   }
+}
+
+LocalDataBackupPreference _backupPreference(Object? value) {
+  if (value is String) {
+    for (final preference in LocalDataBackupPreference.values) {
+      if (preference.name == value) {
+        return preference;
+      }
+    }
+  }
+  return LocalDataBackupPreference.localOnly;
 }
 
 String _string(Object? value, {required String fallback}) {

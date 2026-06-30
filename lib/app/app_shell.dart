@@ -205,11 +205,14 @@ class _AppShellState extends State<AppShell> {
 
   Future<void> _completeOnboarding(OnboardingProfile profile) async {
     await widget.onboardingRepository.saveProfile(profile);
+    final nutritionRepository = await _loadNutritionRepository(profile);
+    await nutritionRepository.saveBackupPreference(profile.backupPreference);
     setState(() {
       _profile = profile;
       _selectedIndex = 0;
       _profileFuture = Future.value(profile);
-      _nutritionRepositoryProfile = null;
+      _nutritionRepositoryProfile = profile;
+      _nutritionRepositoryFuture = Future.value(nutritionRepository);
     });
   }
 
@@ -287,6 +290,7 @@ class _AppShellState extends State<AppShell> {
     return SharedPreferencesNutritionRepository.create(
       seedGoal: profile.toNutritionGoal(calories: 2200),
       seedPreferences: profile.toUserPreferences(),
+      seedBackupPreference: profile.backupPreference,
       foodDataCentralApiKey: await widget.aiSettingsRepository
           .readFoodDataCentralKey(),
       foodDataCentralSearchClient: widget.foodDataCentralSearchClient,

@@ -360,6 +360,47 @@ void main() {
       },
     );
 
+    test('defaults backup preference to local only', () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+
+      final repository = SharedPreferencesNutritionRepository(preferences);
+
+      expect(
+        repository.backupPreference(),
+        LocalDataBackupPreference.localOnly,
+      );
+      expect(
+        preferences.containsKey(
+          SharedPreferencesNutritionRepository.backupPreferenceKey,
+        ),
+        isFalse,
+      );
+    });
+
+    test('persists backup preference after recreation', () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesNutritionRepository(preferences);
+
+      await repository.saveBackupPreference(
+        LocalDataBackupPreference.platformBackupAllowed,
+      );
+
+      final recreated = SharedPreferencesNutritionRepository(preferences);
+
+      expect(
+        recreated.backupPreference(),
+        LocalDataBackupPreference.platformBackupAllowed,
+      );
+      expect(
+        preferences.getString(
+          SharedPreferencesNutritionRepository.backupPreferenceKey,
+        ),
+        LocalDataBackupPreference.platformBackupAllowed.name,
+      );
+    });
+
     test('drops malformed persisted records without crashing', () async {
       SharedPreferences.setMockInitialValues({});
       final preferences = await SharedPreferences.getInstance();
@@ -438,6 +479,9 @@ void main() {
           source: NutritionSeedData.userSource,
         ),
       );
+      await repository.saveBackupPreference(
+        LocalDataBackupPreference.platformBackupAllowed,
+      );
       await repository.flushPendingWrites();
 
       await repository.clearLocalProgress();
@@ -447,6 +491,12 @@ void main() {
       expect(
         preferences.containsKey(SharedPreferencesNutritionRepository.stateKey),
         isFalse,
+      );
+      expect(
+        preferences.getString(
+          SharedPreferencesNutritionRepository.backupPreferenceKey,
+        ),
+        LocalDataBackupPreference.platformBackupAllowed.name,
       );
 
       final recreated = SharedPreferencesNutritionRepository(
@@ -458,6 +508,10 @@ void main() {
 
       expect(recreated.meals(), isEmpty);
       expect(recreated.weightEntries(), isEmpty);
+      expect(
+        recreated.backupPreference(),
+        LocalDataBackupPreference.platformBackupAllowed,
+      );
       expect(summary.meals, isEmpty);
       expect(summary.knownMacroTotals.calories, 0);
     });
