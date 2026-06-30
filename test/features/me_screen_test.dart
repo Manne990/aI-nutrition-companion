@@ -82,7 +82,8 @@ void main() {
     expect(find.text('Mock AI'), findsOneWidget);
     expect(find.text('mock-companion-v1'), findsOneWidget);
     expect(find.text('No token saved'), findsOneWidget);
-    expect(find.text('Secure local storage'), findsOneWidget);
+    expect(find.text('No FoodData Central key'), findsOneWidget);
+    expect(find.text('Secure local storage'), findsWidgets);
     expect(
       find.textContaining('Mock AI is the default for tests and local CI'),
       findsOneWidget,
@@ -119,22 +120,28 @@ void main() {
 
     await _pumpMe(tester, repository);
     await _scrollUntilVisible(tester, find.text('Save token'));
-    await tester.enterText(find.byType(TextField), ' sk-test-token ');
+    await tester.enterText(
+      find.byKey(const Key('ai-provider-token-field')),
+      ' entered provider value ',
+    );
     await tester.tap(find.text('Save token'));
     await tester.pumpAndSettle();
 
     expect((await repository.loadTokenState()).hasToken, isTrue);
     expect(find.text('Token saved'), findsOneWidget);
-    expect(find.text('sk-test-token'), findsNothing);
+    expect(find.text('entered provider value'), findsNothing);
     expect(find.text('Token saved locally.'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), 'sk-updated-token');
+    await tester.enterText(
+      find.byKey(const Key('ai-provider-token-field')),
+      'updated provider value',
+    );
     await _scrollUntilVisible(tester, find.text('Update token'));
     await tester.tap(find.text('Update token'));
     await tester.pumpAndSettle();
 
     expect((await repository.loadTokenState()).hasToken, isTrue);
-    expect(find.text('sk-updated-token'), findsNothing);
+    expect(find.text('updated provider value'), findsNothing);
 
     await _scrollUntilVisible(tester, find.text('Delete token'));
     await tester.tap(find.text('Delete token'));
@@ -143,6 +150,48 @@ void main() {
     expect((await repository.loadTokenState()).hasToken, isFalse);
     expect(find.text('No token saved'), findsOneWidget);
     expect(find.text('Token deleted from this device.'), findsOneWidget);
+  });
+
+  testWidgets('user can save, update, and delete FoodData Central key state', (
+    tester,
+  ) async {
+    final repository = InMemoryAiSettingsRepository();
+
+    await _pumpMe(tester, repository);
+    await _scrollUntilVisible(tester, find.text('Save FoodData Central key'));
+    await tester.enterText(
+      find.byKey(const Key('fooddata-central-api-key-field')),
+      ' entered nutrition value ',
+    );
+    await tester.tap(find.text('Save FoodData Central key'));
+    await tester.pumpAndSettle();
+
+    expect((await repository.loadFoodDataCentralKeyState()).hasKey, isTrue);
+    expect(find.text('FoodData Central key saved'), findsOneWidget);
+    expect(find.text('entered nutrition value'), findsNothing);
+    expect(find.text('FoodData Central key saved locally.'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('fooddata-central-api-key-field')),
+      'updated nutrition value',
+    );
+    await _scrollUntilVisible(tester, find.text('Update FoodData Central key'));
+    await tester.tap(find.text('Update FoodData Central key'));
+    await tester.pumpAndSettle();
+
+    expect((await repository.loadFoodDataCentralKeyState()).hasKey, isTrue);
+    expect(find.text('updated nutrition value'), findsNothing);
+
+    await _scrollUntilVisible(tester, find.text('Delete FoodData Central key'));
+    await tester.tap(find.text('Delete FoodData Central key'));
+    await tester.pumpAndSettle();
+
+    expect((await repository.loadFoodDataCentralKeyState()).hasKey, isFalse);
+    expect(find.text('No FoodData Central key'), findsOneWidget);
+    expect(
+      find.text('FoodData Central key deleted from this device.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('health connection starts disconnected until user intent', (
