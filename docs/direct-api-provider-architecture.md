@@ -36,15 +36,16 @@ V1 should use these boundaries:
 
 - Open Food Facts: direct read-only app calls for packaged-food lookup by
   barcode, with an app-identifying User-Agent and deterministic test transport.
-- FoodData Central: direct app calls only with a user-provided or runtime
-  injected data.gov key; missing-key behavior must be explicit and usable.
+- FoodData Central: direct app calls only with build/app runtime configuration
+  for a controlled environment; missing-key behavior must be explicit and
+  usable.
 - Firebase Auth or Supabase Auth: provider SDK integration may run in the app
-  with provider-approved client configuration, while mock/local auth remains the
-  default test path.
+  with provider-approved client configuration, while the local account boundary
+  remains the default path.
 - AI providers: user-provided tokens may be stored locally through secure
   platform storage; app-owned AI provider keys require a backend.
-- Local storage: local nutrition logs, settings, mock data, and caches may stay
-  on device unless sync is explicitly designed later.
+- Local storage: local nutrition logs, settings, internal test data, and caches
+  may stay on device unless sync is explicitly designed later.
 
 Do not ship app-owned API secrets in the mobile binary. Do not hide shared
 production keys in Dart constants, Flutter assets, plist/json config files,
@@ -59,7 +60,7 @@ Gradle properties committed to git, screenshots, tests, or fixtures.
 | Firebase Auth | Yes, through FlutterFire and `firebase_auth` if identity becomes active. | Firebase app configuration and Firebase API keys are public-by-design identifiers when restricted to Firebase services; auth state is user-owned. | Firebase config may be committed only after project ownership, API restrictions, Security Rules, and App Check posture are reviewed. Do not include non-Firebase API keys or admin credentials. | Required for privileged admin actions, custom claims management, server-trusted sync, callable functions with server secrets, or provider secrets outside Firebase's client model. |
 | Supabase Auth | Yes, through `supabase_flutter` with a project URL and publishable key if selected. | Publishable key is client-safe; legacy anon key is low-privilege client use; secret and service-role keys are elevated backend secrets. | A publishable key may be bundled only with Row Level Security and auth policies reviewed. Never ship `sb_secret_*` or `service_role` keys. | Required for secret/service-role operations, admin data access, bypassing RLS, server-side jobs, or policies that cannot safely expose client access. |
 | AI providers | Yes, only with user-provided tokens and explicit opt-in. | User-owned token stored locally. App-owned model/provider keys are secrets. | Do not commit, log, screenshot, or display saved token values after storage. | Required for app-owned AI keys, central billing, quota controls, audit logging, model mediation, or server-side prompt enrichment. |
-| Health data providers | Not active in V1 beyond mock scaffolding. | Platform user permission and local state. | Do not add HealthKit/Health Connect entitlements or credentials without a separate implementation issue and store-disclosure update. | Required for cross-device sync, server analytics, or any server-held health/nutrition profile. |
+| Health data providers | Not active in V1 beyond scaffolding. | Platform user permission and local state. | Do not add HealthKit/Health Connect entitlements or credentials without a separate implementation issue and store-disclosure update. | Required for cross-device sync, server analytics, or any server-held health/nutrition profile. |
 
 ## Direct Integration Rules
 
@@ -73,8 +74,8 @@ Every direct provider implementation should preserve these constraints:
   observed time, lookup mode, and fallback reason when known.
 - Treat provider errors, rate limits, missing credentials, and malformed data as
   first-class product states rather than crashes or silent empty values.
-- Keep mock providers available for local development, tests, screenshots, and
-  store review notes.
+- Keep deterministic internal providers available for local development, tests,
+  screenshots, and store review notes.
 - Do not cache external data without source, time, and provider identity.
 - Re-check provider docs before production release because direct-use terms,
   quotas, and key handling guidance can change.
@@ -85,8 +86,8 @@ The V1 lookup service uses explicit provider ordering instead of hidden runtime
 branching:
 
 - Barcode lookups should prefer Open Food Facts before generic-food providers.
-- Generic food search should prefer FoodData Central when a user-provided or
-  runtime-injected key is available, then local fallback.
+- Generic food search should prefer FoodData Central when build/app runtime
+  configuration supplies a key, then local fallback.
 - Provider errors, malformed data, missing credentials, and timeouts are source
   gaps. They should be carried into fallback messages rather than treated as
   empty nutrition.
@@ -172,7 +173,7 @@ Add a backend or provider proxy before implementing any of these:
 - any provider terms that prohibit direct mobile calls for the intended use
 
 Backend introduction must include a new privacy and data-flow review. The
-mobile app should still keep mock/local provider paths for CI and graceful
+mobile app should still keep internal/local provider paths for CI and graceful
 offline behavior.
 
 ## Documentation Dependencies
@@ -181,8 +182,7 @@ offline behavior.
   keeps the local account gate as the default until a real Firebase or Supabase
   project is intentionally introduced.
 - `docs/ai-provider-settings.md` remains the user-token storage boundary for AI
-  providers and should be extended for FoodData Central user keys if #39 adds
-  nutrition credentials.
+  providers. FoodData Central credentials remain outside user settings.
 - `docs/health-data-scaffolding.md` remains the health permission boundary.
 - `docs/release-readiness.md` remains the store-submission checklist and should
   be rechecked after any real provider networking or auth SDK is added.

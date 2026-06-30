@@ -51,7 +51,7 @@ Current app facts from this repository:
 - No backend exists yet.
 - User-provided AI token storage is scaffolded through
   `docs/ai-provider-settings.md` and platform secure storage.
-- Health connection scaffolding exists behind a mock provider. No HealthKit
+- Health connection scaffolding exists behind an internal provider. No HealthKit
   entitlement, Android Health Connect permission, or native bridge is enabled
   yet. See `docs/health-data-scaffolding.md`.
 - Local CI is `bash scripts/local_ci.sh`.
@@ -88,8 +88,8 @@ Current app facts from this repository:
 - Set app name, subtitle, category, age rating, pricing, availability, and
   support URL.
 - Add privacy policy URL.
-- Add review notes explaining that V1 uses mock AI by default unless the user
-  configures a provider later.
+- Add review notes explaining that V1 uses the selected AI provider only after
+  the user saves a provider token.
 - If camera/photo or health flows are present, include review notes that explain
   when permissions are requested and what fallback exists if denied.
 
@@ -104,7 +104,7 @@ categories for V1 review:
 | Meal history and nutrition estimates | Local logging and future AI/nutrition adapters | Treat as user content or health/fitness-adjacent data depending on final storage and transmission. |
 | Goals and preferences | Onboarding and Me settings | Declare if collected, transmitted, or linked to the user. |
 | Weight entries | Future #8 work | Treat as sensitive health/fitness data if stored or transmitted. |
-| Health signals | Mock #11 scaffolding only | Declare health data only after actual HealthKit/Health Connect behavior exists beyond the local mock provider. |
+| Health signals | #11 scaffolding only | Declare health data only after actual HealthKit/Health Connect behavior exists beyond the local internal provider. |
 | Chat prompts and responses | Future #9 work | Declare if sent to a provider or stored beyond local session needs. |
 | User-provided AI token state | Future #13 work | Do not expose the token. Declare any token-related collection or diagnostics only if transmitted or linked. |
 | Diagnostics and crash data | Not currently configured | Declare if a crash or analytics SDK is added. |
@@ -255,7 +255,8 @@ final app behavior. At minimum it should describe:
 - Why data is used: nutrition guidance, meal logging, personalization, AI
   provider configuration, health-context recommendations, support, and app
   reliability if diagnostics are added.
-- Whether data is linked to identity. V1 currently has no accounts.
+- Whether data is linked to identity. V1 currently has a device-local account
+  gate and no remote accounts.
 - Whether data is shared with AI, nutrition, health, analytics, crash, or cloud
   providers.
 - How long data is retained locally or remotely.
@@ -323,7 +324,7 @@ signals such as weight, activity, workouts, or sleep to personalize suggestions.
 You can disconnect it later.
 ```
 
-Current V1 scaffolding uses a deterministic mock provider only. It does not add
+Current V1 scaffolding uses a deterministic internal provider only. It does not add
 HealthKit entitlements, Android Health Connect permissions, or native health
 plugin access.
 
@@ -355,8 +356,8 @@ does not delete data already processed by the external provider.
 Fallback if secure storage is unavailable:
 
 ```text
-Secure token storage is unavailable on this platform. Keep mock AI enabled or
-enter a token only after accepting the local-storage risk.
+Secure token storage is unavailable on this platform. Add a token only after
+accepting the local-storage risk.
 ```
 
 ## Account And Data Deletion Requirements
@@ -383,8 +384,8 @@ Prepare these assets before a production or public testing release:
 
 - App name: `AI Nutrition Companion` or final approved name.
 - Subtitle or short description focused on companion guidance, not diagnosis.
-- Full description covering meal logging, nutrition suggestions, mock AI by
-  default, optional provider setup, and privacy boundaries.
+- Full description covering meal logging, nutrition suggestions, optional AI
+  provider setup, and privacy boundaries.
 - Keywords or tags appropriate to nutrition, meal planning, and wellness.
 - Support URL.
 - Marketing URL, optional.
@@ -395,9 +396,9 @@ Prepare these assets before a production or public testing release:
 - Android phone screenshots for required Play sizes.
 - Android tablet screenshots if tablet support is claimed.
 - Feature graphic for Google Play.
-- Demo account or review notes if a future account gate is added.
-- Notes explaining mock AI, optional camera/photo use, optional health data, and
-  token settings when those flows exist.
+- Demo account or local-account review steps.
+- Notes explaining optional AI provider setup, camera/photo use, optional health
+  data, and token settings when those flows exist.
 
 Screenshot set should cover:
 
@@ -423,12 +424,12 @@ Run the matrix before public testing or production submission.
 | Large phone | 430 x 932 class | Large Android phone class | Layout scales without oversized gaps. |
 | Camera permission allowed | iOS camera/photo flow | Android camera/photo flow | Meal photo flow reaches review or fallback. |
 | Camera permission denied | iOS denied state | Android denied state | App explains recovery and offers fallback. |
-| Offline | Airplane mode | Airplane mode | Local/mock flows work; real providers are labeled unavailable. |
-| Mock AI | Default mode | Default mode | Chat and recognition mocks remain deterministic for tests. |
+| Offline | Airplane mode | Airplane mode | Local/internal flows work; real providers are labeled unavailable. |
+| Internal estimators | Default local test path | Default local test path | Chat and recognition test adapters remain deterministic for tests. |
 | Real AI token missing | Future #13 | Future #13 | Real provider mode routes to token/settings guidance. |
-| Token create/update/delete | Future #13 | Future #13 | Token state changes locally and deletion is clear. |
-| Health disconnected | Me tab mock scaffold | Me tab mock scaffold | App works without health access. |
-| Health denied/unavailable | Mocked provider states | Mocked provider states | App explains state and keeps manual flow available. |
+| Token save/delete | Me tab | Me tab | Token state changes locally and deletion is clear. |
+| Health disconnected | Me tab scaffold | Me tab scaffold | App works without health access. |
+| Health denied/unavailable | Provider states | Provider states | App explains state and keeps manual flow available. |
 | Data reset/deletion | Future settings | Future settings | User can reset supported local data and understands limits. |
 
 ## Submission Readiness Checklist
@@ -454,7 +455,7 @@ Use this as the final go/no-go list.
 - [ ] iOS release build completes.
 - [ ] Android app bundle release build completes.
 - [ ] Manual device test matrix is complete.
-- [ ] Review notes explain mock AI, optional provider setup, camera/photo use,
+- [ ] Review notes explain optional provider setup, camera/photo use,
   health-data state, and any unavailable features.
 
 ## Current V1 Gap Summary

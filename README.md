@@ -107,7 +107,8 @@ screenshot/metadata needs, and the pre-submission test matrix.
 ## Environment Variables
 
 No environment variables are required for the default V1 local app. Nutrition
-lookup uses deterministic mock/local adapters unless a real provider is wired.
+lookup uses deterministic internal/local adapters unless a configured provider
+is wired.
 
 Direct nutrition and auth provider architecture is documented in
 [`docs/direct-api-provider-architecture.md`](docs/direct-api-provider-architecture.md).
@@ -144,7 +145,7 @@ lib/
   app/                  App shell, routing surface, and theme
   domain/               Product models and pure domain logic
   features/             User-facing screens by product area
-  services/adapters/    Mock and future real provider boundaries
+  services/adapters/    Internal and future real provider boundaries
   shared/widgets/       Reusable UI components
 test/                   Widget and domain tests
 scripts/local_ci.sh     Agent-runnable local verification
@@ -161,5 +162,6 @@ emulator, or physical device:
 flutter run -d <device-id>
 ```
 
-For this bootstrap, verify that the app starts and shows the Today tab with the
-AI Nutrition Companion placeholder, plus `Kitchen` and `Me` bottom navigation.
+For this bootstrap, verify that the app starts at the local account entry flow
+for a clean install, then reaches `Today`, `Kitchen`, and `Me` after account
+and onboarding completion.

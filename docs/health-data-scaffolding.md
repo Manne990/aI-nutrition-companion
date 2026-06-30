@@ -8,10 +8,11 @@ native HealthKit or Health Connect dependency.
 - Health connection is opt-in from the Me tab.
 - App startup can check local connection state, but it does not request health
   authorization.
-- The default provider is a deterministic mock provider for development and
+- The default provider is a deterministic internal provider for development and
   tests.
 - Supported MVP signal categories are weight, activity, workouts, and sleep.
-- Connected mock signals may personalize deterministic meal suggestions.
+- Connected internal test signals may personalize deterministic meal
+  suggestions.
 - Disconnecting clears the app's local health connection state.
 
 ## Permission States
@@ -20,7 +21,8 @@ The app can render these states:
 
 - `disconnected`: health connection is off and manual nutrition logging still
   works.
-- `connected`: selected mock signals are available to recommendation fixtures.
+- `connected`: selected internal test signals are available to recommendation
+  fixtures.
 - `denied`: permission was denied and the app remains usable without health
   data.
 - `unavailable`: no HealthKit or Health Connect bridge is available for this

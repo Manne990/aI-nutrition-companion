@@ -23,7 +23,7 @@ class MockNutritionCompanionAdapter implements NutritionCompanionAdapter {
     final preferenceSummary = preferences?.dietaryPreferences.isEmpty ?? true
         ? 'quick to make'
         : '${preferences!.dietaryPreferences.first}, quick to make';
-    final provider = configuration?.providerLabel ?? 'Mock AI';
+    final provider = configuration?.providerLabel ?? 'Internal estimator';
     final model = configuration?.settings.model ?? 'mock-companion-v1';
     final source = configuration?.canUseRealProvider ?? false
         ? NutritionSource.aiEstimated

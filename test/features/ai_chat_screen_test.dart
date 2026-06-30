@@ -180,7 +180,7 @@ void main() {
     expect(find.text('What should I eat next?'), findsOneWidget);
     expect(
       find.text(
-        'Companion response unavailable. Try again, use mock AI, or keep planning manually.',
+        'Companion response unavailable. Try again, check provider settings, or keep planning manually.',
       ),
       findsOneWidget,
     );
@@ -212,7 +212,7 @@ void main() {
     expect(find.text('What should I eat next?'), findsOneWidget);
     expect(
       find.text(
-        'Provider rate limit reached. Try again later, use mock AI, or keep planning manually.',
+        'Provider rate limit reached. Try again later or keep planning manually.',
       ),
       findsOneWidget,
     );
@@ -245,7 +245,7 @@ void main() {
     expect(find.text('What should I eat next?'), findsOneWidget);
     expect(
       find.text(
-        'Provider token missing. Update credentials, use mock AI, or keep planning manually.',
+        'Provider token missing. Add a token in Me or keep planning manually.',
       ),
       findsOneWidget,
     );

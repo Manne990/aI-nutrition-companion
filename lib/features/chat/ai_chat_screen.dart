@@ -252,7 +252,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       setState(() {
         _isSending = false;
         _errorMessage =
-            'Companion response unavailable. Try again, use mock AI, or keep planning manually.';
+            'Companion response unavailable. Try again, check provider settings, or keep planning manually.';
       });
     }
   }
@@ -524,16 +524,16 @@ String _safetyLabel(AiChatSafetyBoundary boundary) {
 String _providerFailureMessage(AiProviderFailureKind kind) {
   return switch (kind) {
     AiProviderFailureKind.missingCredential =>
-      'Provider token missing. Update credentials, use mock AI, or keep planning manually.',
+      'Provider token missing. Add a token in Me or keep planning manually.',
     AiProviderFailureKind.timeout =>
-      'Provider timed out. Try again, use mock AI, or keep planning manually.',
+      'Provider timed out. Try again or keep planning manually.',
     AiProviderFailureKind.rateLimited =>
-      'Provider rate limit reached. Try again later, use mock AI, or keep planning manually.',
+      'Provider rate limit reached. Try again later or keep planning manually.',
     AiProviderFailureKind.malformedResponse =>
-      'Provider response was unreadable. Try again, use mock AI, or keep planning manually.',
+      'Provider response was unreadable. Try again or keep planning manually.',
     AiProviderFailureKind.providerUnavailable =>
-      'Provider unavailable. Try again, use mock AI, or keep planning manually.',
+      'Provider unavailable. Check provider settings or keep planning manually.',
     AiProviderFailureKind.providerError =>
-      'Companion response unavailable. Try again, use mock AI, or keep planning manually.',
+      'Companion response unavailable. Try again, check provider settings, or keep planning manually.',
   };
 }

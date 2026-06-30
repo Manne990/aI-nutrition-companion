@@ -74,7 +74,7 @@ These decisions extend the concepts to cover the full V1 scope.
 - Photo logging can start from Today, Chat camera, Kitchen reusable foods, or Quick Log correction, but all paths converge on one estimate-review-and-correct flow.
 - Weight tracking is visible on Today as a compact decision-support signal and editable in Me as a detail surface.
 - Privacy, AI, nutrition disclaimer, token storage disclosure, and health connection status are all reachable from Me and shown contextually before sensitive features are used.
-- Mock AI, mock health data, and local fallback nutrition data are valid V1 states. The UX must not require a production backend.
+- Deterministic internal AI/health test adapters and local fallback nutrition data are valid V1 development states. The UX must not require a production backend.
 
 ## 5. Product Experience Principles
 
@@ -118,7 +118,7 @@ The companion can provide practical nutrition guidance. It must not diagnose, tr
 | --- | --- | --- | --- |
 | Today | Decision hub | What should I eat next? | Suggested next meal, daily rhythm, quick log, daily overview, AI insight, chat entry |
 | Kitchen | Reuse and reduce effort | What do I usually eat or have available? | Favorite meals, common ingredients, habit suggestions, reusable quick-log items |
-| Me | Personal setup and control | What does the app know and use? | Goals, preferences, weight detail, health connection, AI provider/model/token settings, privacy/disclaimers |
+| Me | Personal setup and control | What does the app know and use? | Goals, preferences, weight detail, health connection, AI provider/token settings, privacy/disclaimers |
 
 ### Navigation Rules
 
@@ -161,7 +161,7 @@ The companion can provide practical nutrition guidance. It must not diagnose, tr
 | --- | --- | --- | --- |
 | Log meal entry sheet | Today or Kitchen | Choose camera, photo library, quick item, or manual fallback | V1 scope, #6, #10 |
 | Camera/photo permission state | Full screen/sheet | Explain permission denied, unavailable, or retry path | V1 scope, #6, #12 |
-| Photo analyzing state | Full screen | Show progress while mock/real AI recognition runs | V1 scope, #6 |
+| Photo analyzing state | Full screen | Show progress while photo recognition runs | V1 scope, #6 |
 | Meal estimate review | Full screen | Show recognized foods, portions, confidence, macros, source states | V1 scope, #5, #6, #7 |
 | Correction editor | Sheet/full screen | Edit item name, amount, portion, remove/add item | V1 scope, #6 |
 | Save confirmation | Sheet | Confirm meal saved and update Today overview | V1 scope, #6, #8 |
@@ -174,7 +174,7 @@ The companion can provide practical nutrition guidance. It must not diagnose, tr
 | Chat thread | Full screen from Today | Ask practical nutrition questions using today context | Vision, V1 scope, #9 |
 | Chat response loading | Chat | Show model/provider activity without exposing internals | V1 scope, #9, #13 |
 | Chat safety boundary response | Chat | Decline diagnosis/unsafe claims and redirect to professional advice | V1 scope, #9, #12 |
-| Chat adapter error state | Chat | Show retry, use mock mode, or check provider settings | V1 scope, #9, #13 |
+| Chat adapter error state | Chat | Show retry, manual planning fallback, or provider-settings guidance | V1 scope, #9, #13 |
 
 ### Kitchen
 
@@ -194,8 +194,8 @@ The companion can provide practical nutrition guidance. It must not diagnose, tr
 | Goals and preferences | Me | Edit onboarding choices | V1 scope, #4 |
 | Weight tracking detail | Me | Add/edit weight entries and view simple trend | V1 scope, #8 |
 | Health connection | Me | Connect, disconnect, or view denied/unavailable state | V1 scope, #11 |
-| AI provider settings | Me | Choose mock/real provider, model, and token state | V1 scope, #13 |
-| Token entry/delete | Me | Enter, update, or delete local user-provided API token | V1 scope, #13 |
+| AI provider settings | Me | Choose OpenAI, Gemini, or Anthropic and view app-selected latest model/token state | V1 scope, #13 |
+| Token entry/delete | Me | Save or delete local user-provided API token | V1 scope, #13 |
 | Privacy and disclaimers | Me | Show nutrition, AI, photo, health, and token disclosures | V1 scope, #4, #12, #13 |
 | Release readiness links | Me/docs only | Surface copy requirements when app store work begins | V1 scope, #12 |
 
@@ -226,7 +226,7 @@ States:
 1. User taps Quick Log, camera, or meal logging action.
 2. App asks for camera/photo permission only at that moment.
 3. User captures or selects a photo.
-4. App shows analyzing state using mock or configured AI adapter.
+4. App shows analyzing state using the configured recognition adapter.
 5. Meal estimate review shows foods, portions, confidence, calories, protein, carbs, fat, and source labels.
 6. User corrects food names, portions, or items.
 7. Totals update before save.
@@ -237,8 +237,8 @@ States:
 
 - Empty: no photo selected, offer camera/gallery and quick-log alternatives.
 - Loading: analyzing photo or enriching nutrition facts.
-- Error: AI adapter failed, allow retry, mock fallback, or manual quick-log fallback.
-- Offline: permit mock/local fallback if available; do not claim database verification.
+- Error: AI adapter failed, allow retry or manual quick-log fallback.
+- Offline: permit local fallback if available; do not claim database verification.
 - Permission denied: explain setting path and offer gallery/manual fallback.
 
 ### 8.3 AI Chat Entry And Response
@@ -246,9 +246,9 @@ States:
 1. User enters text from Today composer or opens full chat.
 2. User may use camera shortcut to start photo logging or attach context.
 3. Voice button is visible as a V1 placeholder if voice is not implemented yet.
-4. App builds context from goals, preferences, logged meals, current suggestion, and selected provider/model state.
-5. Mock AI responds deterministically by default.
-6. Real provider mode uses configured provider/model and local token when available.
+4. App builds context from goals, preferences, logged meals, current suggestion, and selected provider state.
+5. The selected provider uses the app-approved latest model after a token is saved.
+6. Internal test adapters remain deterministic for local CI.
 7. Response includes practical advice, uncertainty, and safe boundaries.
 8. User can ask a follow-up, accept suggested action, or jump to logging/settings.
 
@@ -257,25 +257,25 @@ States:
 - Empty: suggested prompt chips such as "What should I eat next?" and "How can I hit protein today?"
 - Loading: companion is thinking, with cancel/back available.
 - Error: show provider/token issue and route to AI settings.
-- Offline: mock responses can work; real provider responses show offline limitation.
+- Offline: local test responses can work; provider responses show offline limitation.
 - Safety boundary: refuse diagnosis or unsafe medical claims and suggest professional care.
 
-### 8.4 AI Provider, Model, And Token Settings
+### 8.4 AI Provider And Token Settings
 
 1. User opens Me.
 2. User opens AI provider settings.
-3. User sees current mode: mock AI or real provider.
-4. User selects provider and model.
+3. User sees the selected provider and latest app-approved model.
+4. User selects OpenAI, Gemini, or Anthropic.
 5. User enters token into secure local storage when supported.
 6. App shows token saved state without revealing the token.
-7. User can update or delete token.
-8. Chat and meal recognition adapters read selected provider/model configuration.
+7. User can delete token.
+8. Chat and meal recognition adapters read selected provider configuration.
 
 States:
 
-- Empty: mock AI selected, no token needed.
+- Empty: selected provider needs a token before provider calls are available.
 - Loading: reading secure-storage state.
-- Error: secure storage unavailable, explain fallback and keep mock as default.
+- Error: secure storage unavailable, explain local-storage risk.
 - Offline: settings can be edited locally; provider validation waits.
 - Token missing: provider selected but unavailable until token is entered.
 
@@ -285,7 +285,7 @@ States:
 2. App explains why weight/activity/workout/sleep signals can improve suggestions.
 3. User chooses connect, not now, or learn more.
 4. App requests platform permission only after connect intent.
-5. Health connection screen shows connected, disconnected, denied, unavailable, or mock state.
+5. Health connection screen shows connected, disconnected, denied, or unavailable state.
 6. User can disconnect later.
 
 States:
@@ -294,7 +294,7 @@ States:
 - Denied: show how to change permission and keep app usable.
 - Unavailable: show platform support gap.
 - Loading: checking platform provider.
-- Error: provider failed; use mock/local fallback for tests.
+- Error: provider failed; use local fallback for tests.
 
 ### 8.6 Daily Overview And Weight Tracking
 
@@ -355,7 +355,7 @@ Every V1 screen should define the closest useful fallback.
 | Empty | Explain what will appear and offer the next low-friction action. |
 | Loading | Name the operation in user terms, not implementation terms. |
 | Error | State what failed, preserve user input, offer retry or fallback. |
-| Offline | Keep local/mock flows working where possible and label unavailable real-provider features. |
+| Offline | Keep local/internal flows working where possible and label unavailable real-provider features. |
 | Permission denied | Explain why permission helps, how to change it, and what can still be done. |
 | Unavailable | Be explicit when a platform feature is not supported in the current environment. |
 
@@ -492,12 +492,12 @@ No V1 screen may require unavailable backend functionality.
 Allowed V1 dependencies:
 
 - local persistence
-- deterministic mock AI
+- deterministic internal AI test adapter
 - direct provider adapters when user config exists
 - secure local token storage or documented fallback
 - local fallback food data
 - public nutrition providers behind configuration
-- mock health provider
+- internal health test provider
 
 Escalate before adding a backend for:
 
@@ -524,7 +524,7 @@ Escalate before adding a backend for:
 | #10 V1-10 Build Kitchen and Quick Log habit suggestions | Kitchen IA, Quick Log behavior, favorite/common meal surfaces, empty states |
 | #11 V1-11 Add HealthKit and Health Connect permission scaffolding | Health connection screen, permission timing, disconnected/denied/unavailable states |
 | #12 V1-12 Prepare App Store and Google Play release readiness | Privacy/disclaimer placement, health/photo/token disclosures, release-readiness touchpoints |
-| #13 V1-13 Configure AI provider, model selection, and secure local token storage | AI provider settings, token entry/delete, mock default, provider error/offline states |
+| #13 V1-13 Configure AI provider and secure local token storage | AI provider settings, token save/delete, latest-model derivation, provider error/offline states |
 | #14 V1-00 Define UX foundation, screen map, and interaction principles | This UX foundation document and verification matrices |
 
 ## 16. Screen And Flow Source Coverage Matrix
@@ -541,7 +541,7 @@ Escalate before adding a backend for:
 | AI chat | Yes | Yes | Yes | #9, #13 |
 | Kitchen and Quick Log | Yes | Yes | Yes | #10 |
 | Health permission states | Yes | Yes | Partial | #11, #12 |
-| AI provider/model/token settings | Yes | Yes | No | #13 |
+| AI provider/token settings | Yes | Yes | No | #13 |
 | Privacy and disclaimers | Yes | Yes | No | #4, #11, #12, #13 |
 | Empty/loading/error/offline states | No | Yes | Partial | #3, #6, #9, #10, #11, #13, #14 |
 | Design tokens and components | No | Yes | Yes | #2, #14 |

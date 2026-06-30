@@ -64,7 +64,10 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
     return AppSectionCard(
       title: 'Photo meal log',
       eyebrow: 'Fast capture',
-      trailing: const AppChip(label: 'Mock AI', icon: Icons.auto_awesome),
+      trailing: const AppChip(
+        label: 'Photo estimate',
+        icon: Icons.auto_awesome,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

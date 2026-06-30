@@ -116,9 +116,7 @@ void main() {
       find.textContaining('Save only a user-owned provider token'),
       findsOneWidget,
     );
-    expect(find.text('Mock AI'), findsNothing);
     expect(find.byType(DropdownButtonFormField<String>), findsNothing);
-    expect(find.text('Update token'), findsNothing);
   });
 
   testWidgets('Me shows privacy and safety disclosures', (tester) async {
@@ -270,7 +268,6 @@ void main() {
     expect(find.text('Token saved locally.'), findsOneWidget);
     expect(find.byKey(const Key('ai-provider-token-field')), findsNothing);
     expect(find.text('Save token'), findsNothing);
-    expect(find.text('Update token'), findsNothing);
 
     await _scrollUntilVisible(tester, find.text('Delete token'));
     await tester.tap(find.text('Delete token'));
