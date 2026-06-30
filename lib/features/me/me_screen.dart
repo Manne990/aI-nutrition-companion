@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../domain/models/ai_settings.dart';
 import '../../domain/models/auth.dart';
+import '../../domain/models/diagnostics.dart';
 import '../../domain/models/health.dart';
 import '../../domain/models/onboarding.dart';
 import '../../domain/repositories/ai_settings_repository.dart';
@@ -25,6 +27,8 @@ class MeScreen extends StatefulWidget {
     required this.onAuthStateChanged,
     required this.onHealthStateChanged,
     required this.onResetOnboarding,
+    this.diagnosticsConfig = const AppDiagnosticsConfig(),
+    this.diagnosticsClipboard = const SystemDiagnosticsClipboard(),
   });
 
   final OnboardingProfile profile;
@@ -37,6 +41,8 @@ class MeScreen extends StatefulWidget {
   final Future<void> Function() onAuthStateChanged;
   final Future<void> Function() onHealthStateChanged;
   final Future<void> Function() onResetOnboarding;
+  final AppDiagnosticsConfig diagnosticsConfig;
+  final DiagnosticsClipboard diagnosticsClipboard;
 
   @override
   State<MeScreen> createState() => _MeScreenState();
@@ -53,6 +59,7 @@ class _MeScreenState extends State<MeScreen> {
   String? _statusMessage;
   String? _credentialStatusMessage;
   String? _healthStatusMessage;
+  String? _diagnosticsStatusMessage;
 
   @override
   void initState() {
@@ -143,6 +150,8 @@ class _MeScreenState extends State<MeScreen> {
                 _buildAiSettingsCard(context, viewState),
                 const SizedBox(height: 16),
                 _buildExternalCredentialsCard(context, viewState),
+                const SizedBox(height: 16),
+                _buildDiagnosticsCard(context, viewState),
               ],
             );
           },
@@ -548,6 +557,37 @@ class _MeScreenState extends State<MeScreen> {
     );
   }
 
+  Widget _buildDiagnosticsCard(
+    BuildContext context,
+    _AiSettingsViewState viewState,
+  ) {
+    return AppSectionCard(
+      title: 'Feedback and diagnostics',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Copy a local support report with app version, provider modes, and high-level feature state. Tokens and API keys are never included.',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          AppSecondaryButton(
+            label: 'Copy diagnostics',
+            icon: Icons.content_copy,
+            onPressed: () => _copyDiagnostics(viewState),
+          ),
+          if (_diagnosticsStatusMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppChip(
+              label: _diagnosticsStatusMessage!,
+              icon: Icons.check_circle_outline,
+              tone: AppChipTone.success,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveAiSettings() async {
     final settings = _draftSettings ?? AiProviderSettings.defaults;
     await widget.aiSettingsRepository.saveSettings(settings);
@@ -659,6 +699,23 @@ class _MeScreenState extends State<MeScreen> {
     });
   }
 
+  Future<void> _copyDiagnostics(_AiSettingsViewState viewState) async {
+    final snapshot = AppDiagnosticsSnapshot(
+      config: widget.diagnosticsConfig,
+      profile: widget.profile,
+      aiSettings: viewState.settings,
+      aiTokenState: viewState.tokenState,
+      foodDataCentralKeyState: viewState.foodDataCentralKeyState,
+      authState: _authState,
+      healthState: _healthState,
+    );
+    await widget.diagnosticsClipboard.copy(snapshot.exportText());
+    setState(() {
+      _diagnosticsStatusMessage =
+          'Diagnostics copied locally. Paste it only when you choose.';
+    });
+  }
+
   String _providerStatus(AiProviderSettings settings, AiTokenState tokenState) {
     if (settings.usesMockProvider) {
       return 'Mock AI is the default for tests and local CI. No token is required.';
@@ -727,4 +784,17 @@ class _AiSettingsViewState {
   final AiProviderSettings settings;
   final AiTokenState tokenState;
   final FoodDataCentralKeyState foodDataCentralKeyState;
+}
+
+abstract interface class DiagnosticsClipboard {
+  Future<void> copy(String text);
+}
+
+class SystemDiagnosticsClipboard implements DiagnosticsClipboard {
+  const SystemDiagnosticsClipboard();
+
+  @override
+  Future<void> copy(String text) {
+    return Clipboard.setData(ClipboardData(text: text));
+  }
 }
