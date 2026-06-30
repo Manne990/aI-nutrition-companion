@@ -73,4 +73,80 @@ void main() {
     expect(find.text('Sounds perfect'), findsOneWidget);
     expect(find.byTooltip('Refresh suggestion'), findsOneWidget);
   });
+
+  testWidgets('action button groups stack long labels on compact widths', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        Center(
+          child: SizedBox(
+            width: 320,
+            child: AppActionButtonGroup(
+              children: [
+                AppSecondaryButton(
+                  label: 'Save FoodData Central key',
+                  icon: Icons.key,
+                  onPressed: () {},
+                ),
+                AppSecondaryButton(
+                  label: 'Delete FoodData Central key',
+                  icon: Icons.delete_outline,
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    final saveTop = tester.getTopLeft(
+      find.widgetWithText(OutlinedButton, 'Save FoodData Central key'),
+    );
+    final deleteTop = tester.getTopLeft(
+      find.widgetWithText(OutlinedButton, 'Delete FoodData Central key'),
+    );
+    expect(deleteTop.dy, greaterThan(saveTop.dy));
+    expect(deleteTop.dx, saveTop.dx);
+  });
+
+  testWidgets('action button groups stay side by side when space allows', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        Center(
+          child: SizedBox(
+            width: 600,
+            child: AppActionButtonGroup(
+              children: [
+                AppSecondaryButton(
+                  label: 'Change',
+                  icon: Icons.refresh,
+                  onPressed: () {},
+                ),
+                AppSecondaryButton(
+                  label: 'Not now',
+                  icon: Icons.schedule_outlined,
+                  onPressed: () {},
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+    final changeTop = tester.getTopLeft(
+      find.widgetWithText(OutlinedButton, 'Change'),
+    );
+    final deferTop = tester.getTopLeft(
+      find.widgetWithText(OutlinedButton, 'Not now'),
+    );
+    expect(deferTop.dy, changeTop.dy);
+    expect(deferTop.dx, greaterThan(changeTop.dx));
+  });
 }

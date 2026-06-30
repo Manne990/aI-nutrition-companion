@@ -80,26 +80,21 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
             ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
+          AppActionButtonGroup(
             children: [
-              Expanded(
-                child: AppPrimaryButton(
-                  label: 'Take photo',
-                  icon: Icons.photo_camera_outlined,
-                  onPressed: _isWorking
-                      ? null
-                      : () => _start(PhotoMealCaptureMode.camera),
-                ),
+              AppPrimaryButton(
+                label: 'Take photo',
+                icon: Icons.photo_camera_outlined,
+                onPressed: _isWorking
+                    ? null
+                    : () => _start(PhotoMealCaptureMode.camera),
               ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: AppSecondaryButton(
-                  label: 'Choose photo',
-                  icon: Icons.photo_library_outlined,
-                  onPressed: _isWorking
-                      ? null
-                      : () => _start(PhotoMealCaptureMode.gallery),
-                ),
+              AppSecondaryButton(
+                label: 'Choose photo',
+                icon: Icons.photo_library_outlined,
+                onPressed: _isWorking
+                    ? null
+                    : () => _start(PhotoMealCaptureMode.gallery),
               ),
             ],
           ),
@@ -821,22 +816,17 @@ class _EstimateReview extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
-        Row(
+        AppActionButtonGroup(
           children: [
-            Expanded(
-              child: AppSecondaryButton(
-                label: 'Add item',
-                icon: Icons.add_circle_outline,
-                onPressed: onAdd,
-              ),
+            AppSecondaryButton(
+              label: 'Add item',
+              icon: Icons.add_circle_outline,
+              onPressed: onAdd,
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: AppPrimaryButton(
-                label: 'Save confirmed meal',
-                icon: Icons.check_circle_outline,
-                onPressed: onSave,
-              ),
+            AppPrimaryButton(
+              label: 'Save confirmed meal',
+              icon: Icons.check_circle_outline,
+              onPressed: onSave,
             ),
           ],
         ),
