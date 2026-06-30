@@ -33,17 +33,26 @@ class PhotoMealLoggingCard extends StatefulWidget {
 
 class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
   late final PhotoMealSource _photoSource;
+  final TextEditingController _barcodeController = TextEditingController();
   MealEstimate? _estimate;
   Meal? _savedMeal;
+  NutritionLookupResult? _packagedLookupResult;
   String? _statusMessage;
   String? _errorMessage;
   var _isWorking = false;
+  var _isLookingUpPackagedFood = false;
   var _drafts = <_EditableMealItem>[];
 
   @override
   void initState() {
     super.initState();
     _photoSource = widget.photoSource ?? ImagePickerPhotoMealSource();
+  }
+
+  @override
+  void dispose() {
+    _barcodeController.dispose();
+    super.dispose();
   }
 
   @override
@@ -103,6 +112,16 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
               tone: AppChipTone.accent,
             ),
           ],
+          const SizedBox(height: AppSpacing.lg),
+          _PackagedFoodLookup(
+            controller: _barcodeController,
+            isLookingUp: _isLookingUpPackagedFood,
+            result: _packagedLookupResult,
+            onLookup: _lookupPackagedFood,
+            onSave: _packagedLookupResult?.food == null
+                ? null
+                : _savePackagedFood,
+          ),
           if (_estimate != null) ...[
             const SizedBox(height: AppSpacing.lg),
             _EstimateReview(
@@ -193,6 +212,83 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
     }
   }
 
+  Future<void> _lookupPackagedFood() async {
+    final barcode = _barcodeController.text.trim();
+    if (barcode.isEmpty) {
+      setState(() {
+        _packagedLookupResult = const NutritionLookupResult(
+          query: NutritionLookupQuery(foodName: 'Packaged food'),
+          status: NutritionLookupStatus.providerError,
+          providerName: 'open-food-facts',
+          message: 'Enter a barcode to look up packaged food.',
+        );
+        _savedMeal = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLookingUpPackagedFood = true;
+      _packagedLookupResult = null;
+      _savedMeal = null;
+      _errorMessage = null;
+      _statusMessage = null;
+    });
+
+    final result = await widget.repository.lookupFood(
+      NutritionLookupQuery(
+        foodName: 'Packaged food $barcode',
+        barcode: barcode,
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLookingUpPackagedFood = false;
+      _packagedLookupResult = result;
+    });
+  }
+
+  void _savePackagedFood() {
+    final result = _packagedLookupResult;
+    final food = result?.food;
+    if (food == null) {
+      return;
+    }
+
+    final savedAt = widget.now ?? DateTime(2026, 6, 29, 17, 55);
+    final meal = Meal(
+      id: 'packaged-meal-${savedAt.millisecondsSinceEpoch}',
+      name: food.name,
+      eatenAt: savedAt,
+      items: [
+        MealItem(
+          id: 'packaged-${food.id}',
+          food: food,
+          servings: 1,
+          source: const SourceMetadata(
+            source: NutritionSource.userConfirmed,
+            label: 'User confirmed packaged food',
+          ),
+        ),
+      ],
+      source: const SourceMetadata(
+        source: NutritionSource.userConfirmed,
+        label: 'User confirmed packaged meal',
+      ),
+    );
+
+    widget.repository.saveMeal(meal);
+    widget.onMealSaved?.call(meal);
+    setState(() {
+      _savedMeal = meal;
+      _statusMessage = 'Packaged food saved to today.';
+      _errorMessage = null;
+    });
+  }
+
   void _updateDraft(_EditableMealItem draft) {
     setState(() {
       _drafts = [
@@ -279,6 +375,178 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
       _statusMessage = 'Confirmed values saved to today.';
       _errorMessage = null;
     });
+  }
+}
+
+class _PackagedFoodLookup extends StatelessWidget {
+  const _PackagedFoodLookup({
+    required this.controller,
+    required this.isLookingUp,
+    required this.result,
+    required this.onLookup,
+    required this.onSave,
+  });
+
+  final TextEditingController controller;
+  final bool isLookingUp;
+  final NutritionLookupResult? result;
+  final VoidCallback onLookup;
+  final VoidCallback? onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = this.result;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softIvory,
+        border: Border.all(color: AppColors.oat),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.qr_code_scanner, color: AppColors.ink),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Packaged food lookup',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Enter a barcode to check packaged-food nutrition before saving it.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Barcode',
+                hintText: 'e.g. 737628064502',
+              ),
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => isLookingUp ? null : onLookup(),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: AppSecondaryButton(
+                label: isLookingUp ? 'Looking up...' : 'Look up package',
+                icon: Icons.search,
+                onPressed: isLookingUp ? null : onLookup,
+              ),
+            ),
+            if (isLookingUp) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const LinearProgressIndicator(),
+            ],
+            if (result != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              _PackagedFoodLookupResult(result: result, onSave: onSave),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PackagedFoodLookupResult extends StatelessWidget {
+  const _PackagedFoodLookupResult({required this.result, required this.onSave});
+
+  final NutritionLookupResult result;
+  final VoidCallback? onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final food = result.food;
+    final message = result.message ?? _statusCopy(result.status);
+    if (food == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppChip(
+            label: _statusCopy(result.status),
+            icon: _statusIcon(result.status),
+            tone: AppChipTone.accent,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(message, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SourceChip.fromMetadata(metadata: food.source),
+            AppChip(
+              label: _statusCopy(result.status),
+              icon: _statusIcon(result.status),
+              tone: result.isVerified
+                  ? AppChipTone.success
+                  : AppChipTone.accent,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(food.name, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          '${food.servingDescription}. ${nutritionSourceDetail(food.source)}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        AppMetricRow(
+          metrics: [
+            AppMetricData(
+              label: 'Calories',
+              value: _macroLabel(food.nutritionPerServing?.calories, ''),
+            ),
+            AppMetricData(
+              label: 'Protein',
+              value: _macroLabel(food.nutritionPerServing?.proteinGrams, 'g'),
+            ),
+            AppMetricData(
+              label: 'Carbs',
+              value: _macroLabel(food.nutritionPerServing?.carbsGrams, 'g'),
+            ),
+            AppMetricData(
+              label: 'Fat',
+              value: _macroLabel(food.nutritionPerServing?.fatGrams, 'g'),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(message, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: AppSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: AppPrimaryButton(
+            label: 'Save packaged food',
+            icon: Icons.check_circle_outline,
+            onPressed: onSave,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -602,4 +870,34 @@ String _numberLabel(double value) {
     return value.round().toString();
   }
   return value.toStringAsFixed(1);
+}
+
+String _statusCopy(NutritionLookupStatus status) {
+  return switch (status) {
+    NutritionLookupStatus.verified => 'Verified source',
+    NutritionLookupStatus.fallback => 'Source gap fallback',
+    NutritionLookupStatus.notFound => 'No packaged match',
+    NutritionLookupStatus.missingApiKey => 'Provider setup needed',
+    NutritionLookupStatus.providerError => 'Provider unavailable',
+  };
+}
+
+IconData _statusIcon(NutritionLookupStatus status) {
+  return switch (status) {
+    NutritionLookupStatus.verified => Icons.verified_outlined,
+    NutritionLookupStatus.fallback => Icons.info_outline,
+    NutritionLookupStatus.notFound => Icons.search_off,
+    NutritionLookupStatus.missingApiKey => Icons.key_off_outlined,
+    NutritionLookupStatus.providerError => Icons.error_outline,
+  };
+}
+
+String _macroLabel(double? value, String unit) {
+  if (value == null) {
+    return 'Missing';
+  }
+  final number = value == value.roundToDouble()
+      ? value.round().toString()
+      : value.toStringAsFixed(1);
+  return '$number$unit';
 }

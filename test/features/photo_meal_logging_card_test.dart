@@ -37,6 +37,18 @@ class _FixturePhotoSource implements PhotoMealSource {
   }
 }
 
+class _ScriptedNutritionRepository extends InMemoryNutritionRepository {
+  _ScriptedNutritionRepository({required this.lookup});
+
+  final Future<NutritionLookupResult> Function(NutritionLookupQuery query)
+  lookup;
+
+  @override
+  Future<NutritionLookupResult> lookupFood(NutritionLookupQuery query) {
+    return lookup(query);
+  }
+}
+
 void main() {
   test('mock meal recognition returns deterministic AI estimate', () async {
     const adapter = MockMealRecognitionAdapter();
@@ -134,6 +146,160 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('looks up and saves packaged food with source metadata', (
+    tester,
+  ) async {
+    late NutritionLookupQuery capturedQuery;
+    final repository = _ScriptedNutritionRepository(
+      lookup: (query) async {
+        capturedQuery = query;
+        return NutritionLookupResult(
+          query: query,
+          status: NutritionLookupStatus.verified,
+          providerName: 'open-food-facts',
+          food: const FoodItem(
+            id: 'off-737628064502',
+            name: 'Packaged skyr cup',
+            servingDescription: '150 g cup',
+            nutritionPerServing: MacroTotals(
+              calories: 120,
+              proteinGrams: 18,
+              carbsGrams: 8,
+              fatGrams: 0.2,
+            ),
+            source: SourceMetadata(
+              source: NutritionSource.databaseVerified,
+              label: 'Open Food Facts',
+              provider: 'open-food-facts',
+              confidence: 0.95,
+            ),
+          ),
+          message: 'Matched packaged product nutrition by barcode.',
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        PhotoMealLoggingCard(
+          repository: repository,
+          now: DateTime(2026, 6, 29, 19),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), '737628064502');
+    await tester.tap(find.text('Look up package'));
+    await tester.pumpAndSettle();
+
+    expect(capturedQuery.barcode, '737628064502');
+    expect(find.text('Packaged skyr cup'), findsOneWidget);
+    expect(find.text('Open Food Facts'), findsOneWidget);
+    expect(find.text('Verified source'), findsOneWidget);
+    expect(
+      find.text('Matched packaged product nutrition by barcode.'),
+      findsOneWidget,
+    );
+
+    await _ensureVisible(tester, find.text('Save packaged food'));
+    await tester.tap(find.text('Save packaged food'));
+    await tester.pumpAndSettle();
+
+    final savedMeal = repository.meals().last;
+    expect(savedMeal.name, 'Packaged skyr cup');
+    expect(savedMeal.source.source, NutritionSource.userConfirmed);
+    expect(savedMeal.items.single.food.source.provider, 'open-food-facts');
+    expect(savedMeal.items.single.food.source.isVerified, isTrue);
+    expect(savedMeal.knownMacroTotals.proteinGrams, 18);
+    expect(find.text('Packaged food saved to today.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'represents packaged lookup not found provider error and fallback',
+    (tester) async {
+      final scriptedResults =
+          <NutritionLookupResult Function(NutritionLookupQuery)>[
+            (query) => NutritionLookupResult(
+              query: query,
+              status: NutritionLookupStatus.notFound,
+              providerName: 'open-food-facts',
+              message: 'No Open Food Facts product matched barcode 000.',
+            ),
+            (query) => NutritionLookupResult(
+              query: query,
+              status: NutritionLookupStatus.providerError,
+              providerName: 'open-food-facts',
+              message: 'Open Food Facts returned malformed nutrition data.',
+            ),
+            (query) => NutritionLookupResult(
+              query: query,
+              status: NutritionLookupStatus.fallback,
+              providerName: 'local-fallback',
+              food: const FoodItem(
+                id: 'local-bar',
+                name: 'Fallback protein bar',
+                servingDescription: '1 bar',
+                nutritionPerServing: MacroTotals(
+                  calories: 210,
+                  proteinGrams: 12,
+                  carbsGrams: 22,
+                  fatGrams: 7,
+                ),
+                source: SourceMetadata(
+                  source: NutritionSource.fallback,
+                  label: 'Local fallback',
+                  provider: 'local-fallback',
+                ),
+              ),
+              message:
+                  'Matched local fallback nutrition; confirm if precision matters.',
+            ),
+          ];
+      var lookupIndex = 0;
+      final repository = _ScriptedNutritionRepository(
+        lookup: (query) async => scriptedResults[lookupIndex++](query),
+      );
+
+      await tester.pumpWidget(
+        _wrap(PhotoMealLoggingCard(repository: repository)),
+      );
+
+      await tester.enterText(find.byType(TextField), '000');
+      await tester.tap(find.text('Look up package'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('No Open Food Facts product matched barcode 000.'),
+        findsOneWidget,
+      );
+      expect(find.text('No packaged match'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '111');
+      await tester.tap(find.text('Look up package'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Open Food Facts returned malformed nutrition data.'),
+        findsOneWidget,
+      );
+      expect(find.text('Provider unavailable'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), '222');
+      await tester.tap(find.text('Look up package'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Fallback protein bar'), findsOneWidget);
+      expect(find.text('Local fallback'), findsOneWidget);
+      expect(find.text('Source gap fallback'), findsOneWidget);
+      expect(
+        find.text(
+          'Matched local fallback nutrition; confirm if precision matters.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('permission denial leaves usable retry actions', (tester) async {
     final repository = InMemoryNutritionRepository(seedMeals: const []);
