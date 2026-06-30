@@ -15,6 +15,11 @@ abstract interface class AuthRepository {
     required String displayName,
   });
 
+  Future<AuthAccountState> updateLocalAccount({
+    required String email,
+    required String displayName,
+  });
+
   Future<AuthSignInResult> signInLocalAccount({required String email});
 
   Future<AuthAccountState> signOut();
@@ -130,6 +135,30 @@ class SharedPreferencesAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthAccountState> updateLocalAccount({
+    required String email,
+    required String displayName,
+  }) async {
+    final account = LocalAccountRecord(
+      email: email,
+      displayName: displayName.trim().isEmpty ? 'Local user' : displayName,
+      createdAt:
+          (await loadLocalAccount())?.createdAt ??
+          now?.call() ??
+          DateTime.now(),
+    );
+    await _preferences.setString(accountKey, jsonEncode(account.toJson()));
+    final state = AuthAccountState(
+      status: AuthConnectionStatus.signedIn,
+      provider: AuthProvider.local,
+      userLabel: account.displayName,
+      statusDetail: 'Signed in with ${account.normalizedEmail}.',
+    );
+    await _saveState(state);
+    return state;
+  }
+
+  @override
   Future<AuthSignInResult> signInLocalAccount({required String email}) async {
     final account = await loadLocalAccount();
     final currentState = await loadState();
@@ -214,6 +243,25 @@ class InMemoryAuthRepository implements AuthRepository {
       email: email,
       displayName: displayName.trim().isEmpty ? 'Local user' : displayName,
       createdAt: DateTime.now(),
+    );
+    _state = AuthAccountState(
+      status: AuthConnectionStatus.signedIn,
+      provider: AuthProvider.local,
+      userLabel: _account!.displayName,
+      statusDetail: 'Signed in with ${_account!.normalizedEmail}.',
+    );
+    return _state;
+  }
+
+  @override
+  Future<AuthAccountState> updateLocalAccount({
+    required String email,
+    required String displayName,
+  }) async {
+    _account = LocalAccountRecord(
+      email: email,
+      displayName: displayName.trim().isEmpty ? 'Local user' : displayName,
+      createdAt: _account?.createdAt ?? DateTime.now(),
     );
     _state = AuthAccountState(
       status: AuthConnectionStatus.signedIn,
