@@ -1,21 +1,23 @@
-enum AiProvider { mock, openai, anthropic }
+enum AiProvider { openai, gemini, anthropic }
 
 class AiProviderOption {
   const AiProviderOption({
     required this.provider,
     required this.label,
-    required this.models,
+    required this.latestModel,
     required this.requiresToken,
     required this.description,
+    required this.tokenHelpText,
+    required this.tokenUrl,
   });
 
   final AiProvider provider;
   final String label;
-  final List<String> models;
+  final String latestModel;
   final bool requiresToken;
   final String description;
-
-  String get defaultModel => models.first;
+  final String tokenHelpText;
+  final String tokenUrl;
 }
 
 class AiProviderCatalog {
@@ -23,25 +25,35 @@ class AiProviderCatalog {
 
   static const options = [
     AiProviderOption(
-      provider: AiProvider.mock,
-      label: 'Mock AI',
-      models: ['mock-companion-v1'],
-      requiresToken: false,
-      description: 'Deterministic local responses for tests and development.',
-    ),
-    AiProviderOption(
       provider: AiProvider.openai,
       label: 'OpenAI',
-      models: ['gpt-4.1-mini', 'gpt-4.1'],
+      latestModel: 'gpt-4.1-mini',
       requiresToken: true,
-      description: 'Real-provider mode with your locally stored token.',
+      description: 'Uses the current app-approved OpenAI model automatically.',
+      tokenHelpText:
+          'Create an OpenAI API key in the OpenAI dashboard, then save it here.',
+      tokenUrl: 'https://platform.openai.com/api-keys',
+    ),
+    AiProviderOption(
+      provider: AiProvider.gemini,
+      label: 'Gemini',
+      latestModel: 'gemini-1.5-flash-latest',
+      requiresToken: true,
+      description: 'Uses the current app-approved Gemini model automatically.',
+      tokenHelpText:
+          'Create a Gemini API key in Google AI Studio, then save it here.',
+      tokenUrl: 'https://aistudio.google.com/app/apikey',
     ),
     AiProviderOption(
       provider: AiProvider.anthropic,
       label: 'Anthropic',
-      models: ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest'],
+      latestModel: 'claude-3-5-haiku-latest',
       requiresToken: true,
-      description: 'Real-provider mode with your locally stored token.',
+      description:
+          'Uses the current app-approved Anthropic model automatically.',
+      tokenHelpText:
+          'Create an Anthropic API key in the Anthropic Console, then save it here.',
+      tokenUrl: 'https://console.anthropic.com/settings/keys',
     ),
   ];
 
@@ -52,23 +64,20 @@ class AiProviderCatalog {
   static AiProvider providerFromName(String? name) {
     return AiProvider.values.firstWhere(
       (provider) => provider.name == name,
-      orElse: () => AiProvider.mock,
+      orElse: () => AiProvider.openai,
     );
   }
 
-  static String normalizeModel(AiProvider provider, String? model) {
+  static String normalizeModel(AiProvider provider, String? _) {
     final option = optionFor(provider);
-    if (model != null && option.models.contains(model)) {
-      return model;
-    }
-    return option.defaultModel;
+    return option.latestModel;
   }
 }
 
 class AiProviderSettings {
   const AiProviderSettings({
-    this.provider = AiProvider.mock,
-    this.model = 'mock-companion-v1',
+    this.provider = AiProvider.openai,
+    this.model = 'gpt-4.1-mini',
   });
 
   final AiProvider provider;
@@ -77,8 +86,6 @@ class AiProviderSettings {
   static const defaults = AiProviderSettings();
 
   AiProviderOption get option => AiProviderCatalog.optionFor(provider);
-
-  bool get usesMockProvider => provider == AiProvider.mock;
 
   bool get requiresToken => option.requiresToken;
 
@@ -150,14 +157,9 @@ class AiAdapterConfiguration {
   bool get canUseRealProvider =>
       settings.requiresToken && tokenState.hasToken && tokenState.isAvailable;
 
-  bool get shouldUseMock => settings.usesMockProvider;
-
   String get providerLabel => settings.option.label;
 
   String get modeLabel {
-    if (settings.usesMockProvider) {
-      return 'Mock mode';
-    }
     if (canUseRealProvider) {
       return '${settings.option.label} ready';
     }

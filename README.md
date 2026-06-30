@@ -130,12 +130,12 @@ release.
 
 AI provider calls must not hard-code production API keys in the mobile app.
 User-provided tokens are stored on device when secure platform storage is
-available, and mock AI remains the default local development path.
+available, and Settings exposes OpenAI, Gemini, and Anthropic provider choices.
 
-Provider/model settings and local token storage are documented in
-[`docs/ai-provider-settings.md`](docs/ai-provider-settings.md). Mock AI remains
-the default for tests and local CI; real provider chat calls use an injected
-transport with deterministic tests and require a user-owned saved token.
+Provider settings, app-selected latest models, and local token storage are
+documented in [`docs/ai-provider-settings.md`](docs/ai-provider-settings.md).
+Provider chat calls use an injected transport with deterministic tests and
+require a user-owned saved token.
 
 ## Project Structure
 

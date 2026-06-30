@@ -182,7 +182,7 @@ class _MeScreenState extends State<MeScreen> {
               const _DisclosureBullet(
                 icon: Icons.cloud_off_outlined,
                 text:
-                    'V1 is local-first with mock defaults, signed-out use, and no custom backend account sync.',
+                    'V1 is local-first with signed-out use and no custom backend account sync.',
               ),
               const _DisclosureBullet(
                 icon: Icons.camera_alt_outlined,
@@ -232,31 +232,16 @@ class _MeScreenState extends State<MeScreen> {
                 return;
               }
               setState(() {
-                _draftSettings = settings.copyWith(
-                  provider: provider,
-                  model: AiProviderCatalog.optionFor(provider).defaultModel,
-                );
+                _draftSettings = settings.copyWith(provider: provider);
                 _statusMessage = null;
               });
             },
           ),
           const SizedBox(height: AppSpacing.sm),
-          DropdownButtonFormField<String>(
-            initialValue: settings.model,
-            decoration: const InputDecoration(labelText: 'Model'),
-            items: [
-              for (final model in option.models)
-                DropdownMenuItem(value: model, child: Text(model)),
-            ],
-            onChanged: (model) {
-              if (model == null) {
-                return;
-              }
-              setState(() {
-                _draftSettings = settings.copyWith(model: model);
-                _statusMessage = null;
-              });
-            },
+          AppChip(
+            label: 'Latest model: ${option.latestModel}',
+            icon: Icons.auto_awesome_outlined,
+            tone: AppChipTone.accent,
           ),
           const SizedBox(height: AppSpacing.md),
           AppPrimaryButton(
@@ -273,7 +258,14 @@ class _MeScreenState extends State<MeScreen> {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Real provider mode may send prompts and nutrition context to the selected provider when networking is enabled. Mock AI stays local for default use and tests.',
+            'Chat requests can send prompts and nutrition context to the selected provider after you save a user-owned token.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            '${option.tokenHelpText} Token page: ${option.tokenUrl}',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
@@ -310,32 +302,32 @@ class _MeScreenState extends State<MeScreen> {
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          TextField(
-            key: const Key('ai-provider-token-field'),
-            controller: _tokenController,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Provider token',
-              hintText: 'Paste token to save locally',
-              helperText: 'Saved tokens are never shown again.',
+          if (tokenState.hasToken) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppSecondaryButton(
+              label: 'Delete token',
+              icon: Icons.delete_outline,
+              onPressed: _deleteToken,
             ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AppActionButtonGroup(
-            children: [
-              AppSecondaryButton(
-                label: tokenState.hasToken ? 'Update token' : 'Save token',
-                icon: Icons.key,
-                onPressed: _saveToken,
+          ] else ...[
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              key: const Key('ai-provider-token-field'),
+              controller: _tokenController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Provider token',
+                hintText: 'Paste token to save locally',
+                helperText: 'Saved tokens are never shown again.',
               ),
-              AppSecondaryButton(
-                label: 'Delete token',
-                icon: Icons.delete_outline,
-                onPressed: tokenState.hasToken ? _deleteToken : null,
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppSecondaryButton(
+              label: 'Save token',
+              icon: Icons.key,
+              onPressed: _saveToken,
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Text(
             tokenState.errorMessage ??
@@ -638,11 +630,12 @@ class _MeScreenState extends State<MeScreen> {
   }
 
   Future<void> _saveAiSettings() async {
-    final settings = _draftSettings ?? AiProviderSettings.defaults;
+    final settings = (_draftSettings ?? AiProviderSettings.defaults)
+        .normalized();
     await widget.aiSettingsRepository.saveSettings(settings);
     await widget.onAiSettingsChanged();
     setState(() {
-      _statusMessage = '${settings.option.label} ${settings.model} saved.';
+      _statusMessage = '${settings.option.label} saved with ${settings.model}.';
       _aiSettingsFuture = _loadAiSettings();
     });
   }
@@ -748,9 +741,6 @@ class _MeScreenState extends State<MeScreen> {
   }
 
   String _providerStatus(AiProviderSettings settings, AiTokenState tokenState) {
-    if (settings.usesMockProvider) {
-      return 'Mock AI is the default for tests and local CI. No token is required.';
-    }
     if (tokenState.hasToken) {
       return '${settings.option.label} is selected with ${settings.model}. Chat requests can be sent to the selected provider with your saved token.';
     }

@@ -2,10 +2,10 @@
 
 Status: V1 provider/credential boundary for issues #13 and #39
 
-AI Nutrition Companion runs in deterministic mock mode by default. V1 can store
-a user-selected provider, model, and user-provided token locally so future chat
-and meal-recognition adapters can switch configuration without hard-coded
-production secrets.
+AI Nutrition Companion stores a user-selected provider and user-provided token
+locally so chat and meal-recognition adapters can switch configuration without
+hard-coded production secrets. The app chooses the current app-approved latest
+model internally for the selected provider.
 
 FoodData Central service credentials are not user settings. The app reads that
 key from build/app configuration when a controlled environment provides it.
@@ -16,8 +16,8 @@ persist an Open Food Facts token or key.
 
 Provider settings are stored in local app preferences:
 
-- selected provider: `mock`, `openai`, or `anthropic`
-- selected model for that provider
+- selected provider: `openai`, `gemini`, or `anthropic`
+- latest model id derived by the app for that provider
 
 Provider tokens are stored separately through the app's token storage
 abstraction:
@@ -40,17 +40,17 @@ Do not commit:
 - screenshots or logs that expose provider tokens
 - screenshots or logs that expose provider keys
 
-Mock AI remains the default for local development and CI. Real provider chat
-calls are available only after the user selects a real provider and saves a
-user-owned token; tests use injected transports and do not make live calls.
+Provider chat calls are available only after the user selects a provider and
+saves a user-owned token; tests use injected transports and do not make live
+calls.
 
 ## User Controls
 
 The Me tab provides:
 
 - provider selection
-- model selection
-- token save/update
+- provider-specific token setup help
+- token save when no token is stored
 - token deletion
 - visible token state without revealing the token
 

@@ -306,9 +306,6 @@ class _AppShellState extends State<AppShell> {
   }
 
   AiChatAdapter _createAiChatAdapter(AiAdapterConfiguration configuration) {
-    if (configuration.settings.usesMockProvider) {
-      return const MockAiChatAdapter();
-    }
     return RealProviderAiChatAdapter(
       configuration: configuration,
       readToken: widget.aiSettingsRepository.readProviderToken,

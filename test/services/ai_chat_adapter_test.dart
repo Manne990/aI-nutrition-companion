@@ -77,7 +77,7 @@ void main() {
     expect(summary, contains('2 meals today: Skyr bowl, Chicken salad'));
     expect(summary, contains('45g protein remaining'));
     expect(summary, contains('current suggestion: Skyr bowl with berries'));
-    expect(summary, contains('adapter: Mock AI mock-companion-v1'));
+    expect(summary, contains('adapter: OpenAI gpt-4.1-mini'));
   });
 
   test('routes safety boundaries before ordinary advice', () {
@@ -165,6 +165,50 @@ void main() {
       expect(transport.headers?['authorization'], 'Bearer user-owned-token');
       expect(transport.requestBody, contains('"model":"gpt-4.1-mini"'));
       expect(transport.requestBody, isNot(contains('user-owned-token')));
+    },
+  );
+
+  test(
+    'real Gemini adapter sends user token through injected transport',
+    () async {
+      final transport = _RecordingAiProviderTransport(
+        statusCode: 200,
+        body:
+            '{"candidates":[{"content":{"parts":[{"text":"Try oats with yogurt."}]}}]}',
+      );
+      final adapter = RealProviderAiChatAdapter(
+        configuration: const AiAdapterConfiguration(
+          settings: AiProviderSettings(
+            provider: AiProvider.gemini,
+            model: 'gemini-1.5-flash-latest',
+          ),
+          tokenState: AiTokenState(
+            hasToken: true,
+            isSecureStorage: true,
+            storageLabel: 'test secure storage',
+          ),
+        ),
+        readToken: () async => 'gemini-user-token',
+        transport: transport,
+      );
+
+      final response = await adapter.sendMessage(
+        prompt: 'What should I eat next?',
+        context: context(),
+        history: const [],
+      );
+
+      expect(response.message, 'Try oats with yogurt.');
+      expect(
+        transport.uri,
+        Uri.https(
+          'generativelanguage.googleapis.com',
+          '/v1beta/models/gemini-1.5-flash-latest:generateContent',
+          {'key': 'gemini-user-token'},
+        ),
+      );
+      expect(transport.requestBody, contains('systemInstruction'));
+      expect(transport.requestBody, isNot(contains('gemini-user-token')));
     },
   );
 
