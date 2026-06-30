@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../domain/models/nutrition.dart';
 import '../../domain/models/onboarding.dart';
 import '../../shared/widgets/app_action_buttons.dart';
 import '../../shared/widgets/app_section_card.dart';
@@ -27,6 +28,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _acceptedNutrition = false;
   bool _acceptedAi = false;
   bool _acceptedPrivacy = false;
+  LocalDataBackupPreference _backupPreference =
+      LocalDataBackupPreference.localOnly;
   final Set<String> _dietaryPreferences = {'high protein'};
 
   bool get _canFinish => _acceptedNutrition && _acceptedAi && _acceptedPrivacy;
@@ -92,9 +95,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     },
                   ),
                   _ConsentStep(
+                    backupPreference: _backupPreference,
                     acceptedNutrition: _acceptedNutrition,
                     acceptedAi: _acceptedAi,
                     acceptedPrivacy: _acceptedPrivacy,
+                    onBackupPreferenceChanged: (preference) {
+                      setState(() => _backupPreference = preference);
+                    },
                     onNutritionChanged: (value) {
                       setState(() => _acceptedNutrition = value);
                     },
@@ -183,6 +190,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         acceptedAiGuidanceDisclaimer: _acceptedAi,
         acceptedPrivacyBoundary: _acceptedPrivacy,
         completedAt: DateTime.now(),
+        backupPreference: _backupPreference,
       ),
     );
   }
@@ -341,17 +349,21 @@ class _TargetStep extends StatelessWidget {
 
 class _ConsentStep extends StatelessWidget {
   const _ConsentStep({
+    required this.backupPreference,
     required this.acceptedNutrition,
     required this.acceptedAi,
     required this.acceptedPrivacy,
+    required this.onBackupPreferenceChanged,
     required this.onNutritionChanged,
     required this.onAiChanged,
     required this.onPrivacyChanged,
   });
 
+  final LocalDataBackupPreference backupPreference;
   final bool acceptedNutrition;
   final bool acceptedAi;
   final bool acceptedPrivacy;
+  final ValueChanged<LocalDataBackupPreference> onBackupPreferenceChanged;
   final ValueChanged<bool> onNutritionChanged;
   final ValueChanged<bool> onAiChanged;
   final ValueChanged<bool> onPrivacyChanged;
@@ -365,6 +377,35 @@ class _ConsentStep extends StatelessWidget {
           title: 'Before AI guidance',
           child: Text(
             'Nutrition guidance is general wellness support, not medical care. AI estimates can be wrong, and you can correct or ignore them.',
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppSectionCard(
+          title: 'Local data backup',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SegmentedButton<LocalDataBackupPreference>(
+                segments: const [
+                  ButtonSegment(
+                    value: LocalDataBackupPreference.localOnly,
+                    label: Text('Local only'),
+                    icon: Icon(Icons.cloud_off_outlined),
+                  ),
+                  ButtonSegment(
+                    value: LocalDataBackupPreference.platformBackupAllowed,
+                    label: Text('Allow backup'),
+                    icon: Icon(Icons.cloud_done_outlined),
+                  ),
+                ],
+                selected: {backupPreference},
+                onSelectionChanged: (selection) {
+                  onBackupPreferenceChanged(selection.single);
+                },
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(backupPreference.description),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.md),

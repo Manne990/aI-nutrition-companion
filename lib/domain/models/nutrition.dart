@@ -336,6 +336,28 @@ class UserPreferences {
   final String coachingTone;
 }
 
+enum LocalDataBackupPreference {
+  localOnly,
+  platformBackupAllowed;
+
+  String get label {
+    return switch (this) {
+      LocalDataBackupPreference.localOnly => 'Local only',
+      LocalDataBackupPreference.platformBackupAllowed =>
+        'Platform backup allowed',
+    };
+  }
+
+  String get description {
+    return switch (this) {
+      LocalDataBackupPreference.localOnly =>
+        'Confirmed meals and progress stay out of iCloud or Android backup.',
+      LocalDataBackupPreference.platformBackupAllowed =>
+        'This device may include confirmed meals and progress in platform backup.',
+    };
+  }
+}
+
 enum IngredientAvailability { available, runningLow, missing, unknown }
 
 class KitchenInventoryItem {

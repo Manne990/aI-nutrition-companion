@@ -6,6 +6,7 @@ import '../../domain/models/ai_settings.dart';
 import '../../domain/models/auth.dart';
 import '../../domain/models/diagnostics.dart';
 import '../../domain/models/health.dart';
+import '../../domain/models/nutrition.dart';
 import '../../domain/models/onboarding.dart';
 import '../../domain/repositories/ai_settings_repository.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -66,6 +67,7 @@ class _MeScreenState extends State<MeScreen> {
   String? _healthStatusMessage;
   String? _diagnosticsStatusMessage;
   String? _nutritionStatusMessage;
+  String? _backupStatusMessage;
 
   @override
   void initState() {
@@ -632,6 +634,7 @@ class _MeScreenState extends State<MeScreen> {
   Widget _buildLocalNutritionDataCard(BuildContext context) {
     final repository = widget.nutritionRepository;
     final storageStatus = repository.storageStatus();
+    final backupPreference = repository.backupPreference();
     final mealCount = repository.meals().length;
     final weightCount = repository.weightEntries().length;
 
@@ -641,7 +644,7 @@ class _MeScreenState extends State<MeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Confirmed meals and daily progress are stored on this device and can be cleared without changing onboarding or credentials.',
+            'Confirmed meals and daily progress are stored on this device. Choose whether platform backup may include them.',
           ),
           const SizedBox(height: AppSpacing.md),
           Wrap(
@@ -664,6 +667,19 @@ class _MeScreenState extends State<MeScreen> {
                 icon: Icons.storage_outlined,
               ),
               AppChip(
+                label: backupPreference.label,
+                icon:
+                    backupPreference ==
+                        LocalDataBackupPreference.platformBackupAllowed
+                    ? Icons.cloud_done_outlined
+                    : Icons.cloud_off_outlined,
+                tone:
+                    backupPreference ==
+                        LocalDataBackupPreference.platformBackupAllowed
+                    ? AppChipTone.accent
+                    : AppChipTone.neutral,
+              ),
+              AppChip(
                 label: _mealCountLabel(mealCount),
                 icon: Icons.restaurant_outlined,
               ),
@@ -679,6 +695,40 @@ class _MeScreenState extends State<MeScreen> {
               label: storageStatus.errorMessage!,
               icon: Icons.error_outline,
               tone: AppChipTone.accent,
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          SegmentedButton<LocalDataBackupPreference>(
+            segments: const [
+              ButtonSegment(
+                value: LocalDataBackupPreference.localOnly,
+                label: Text('Local only'),
+                icon: Icon(Icons.cloud_off_outlined),
+              ),
+              ButtonSegment(
+                value: LocalDataBackupPreference.platformBackupAllowed,
+                label: Text('Allow backup'),
+                icon: Icon(Icons.cloud_done_outlined),
+              ),
+            ],
+            selected: {backupPreference},
+            onSelectionChanged: (selection) {
+              _saveBackupPreference(selection.single);
+            },
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            backupPreference.description,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
+          if (_backupStatusMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppChip(
+              label: _backupStatusMessage!,
+              icon: Icons.check_circle_outline,
+              tone: AppChipTone.success,
             ),
           ],
           const SizedBox(height: AppSpacing.md),
@@ -832,6 +882,17 @@ class _MeScreenState extends State<MeScreen> {
     await widget.onResetNutritionProgress();
     setState(() {
       _nutritionStatusMessage = 'Nutrition history reset on this device.';
+      _backupStatusMessage = null;
+    });
+  }
+
+  Future<void> _saveBackupPreference(
+    LocalDataBackupPreference preference,
+  ) async {
+    await widget.nutritionRepository.saveBackupPreference(preference);
+    setState(() {
+      _backupStatusMessage = '${preference.label} saved.';
+      _nutritionStatusMessage = null;
     });
   }
 
