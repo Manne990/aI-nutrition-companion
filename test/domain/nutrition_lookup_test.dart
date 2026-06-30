@@ -252,6 +252,182 @@ void main() {
   });
 
   group('NutritionEnrichmentService', () {
+    test('uses configured provider order before local fallback', () async {
+      final first = _ScriptedNutritionLookupProvider(
+        providerName: 'open-food-facts',
+        result: const NutritionLookupResult(
+          query: NutritionLookupQuery(foodName: 'salmon'),
+          status: NutritionLookupStatus.notFound,
+          providerName: 'open-food-facts',
+          message: 'No barcode result.',
+        ),
+      );
+      final second = _ScriptedNutritionLookupProvider(
+        providerName: 'fooddata-central',
+        result: const NutritionLookupResult(
+          query: NutritionLookupQuery(foodName: 'salmon'),
+          status: NutritionLookupStatus.verified,
+          providerName: 'fooddata-central',
+          food: _foodDataCentralSalmon,
+          message: 'Matched configured FoodData Central nutrition.',
+        ),
+      );
+      final service = NutritionEnrichmentService(
+        providers: [first, second],
+        fallbackProvider: LocalNutritionLookupProvider(foods: const []),
+      );
+
+      final result = await service.lookupFood(
+        const NutritionLookupQuery(foodName: 'salmon'),
+      );
+
+      expect(result.status, NutritionLookupStatus.verified);
+      expect(result.providerName, 'fooddata-central');
+      expect(first.lookupCount, 1);
+      expect(second.lookupCount, 1);
+    });
+
+    test('uses local fallback when a provider times out', () async {
+      final service = NutritionEnrichmentService(
+        providers: [
+          _ScriptedNutritionLookupProvider(
+            providerName: 'fooddata-central',
+            delay: const Duration(milliseconds: 50),
+            result: const NutritionLookupResult(
+              query: NutritionLookupQuery(foodName: 'banana'),
+              status: NutritionLookupStatus.verified,
+              providerName: 'fooddata-central',
+              food: _foodDataCentralSalmon,
+            ),
+          ),
+        ],
+        fallbackProvider: LocalNutritionLookupProvider(
+          foods: NutritionSeedData.foods,
+        ),
+        policy: const NutritionLookupPolicy(
+          providerTimeout: Duration(milliseconds: 1),
+        ),
+      );
+
+      final result = await service.lookupFood(
+        const NutritionLookupQuery(foodName: 'banana'),
+      );
+
+      expect(result.status, NutritionLookupStatus.fallback);
+      expect(result.providerName, 'local-fallback');
+      expect(result.message, contains('fooddata-central lookup timed out'));
+      expect(result.food?.source.source, NutritionSource.fallback);
+    });
+
+    test('uses cached provider nutrition with preserved provenance', () async {
+      final observedAt = DateTime.utc(2026, 6, 30, 9);
+      final cache = NutritionLookupCache()
+        ..write(
+          NutritionLookupResult(
+            query: const NutritionLookupQuery(foodName: 'salmon'),
+            status: NutritionLookupStatus.verified,
+            providerName: 'fooddata-central',
+            food: _foodDataCentralSalmonWithObservedAt(observedAt),
+            message: 'Matched cached FoodData Central nutrition.',
+          ),
+        );
+      final service = NutritionEnrichmentService(
+        providers: [
+          _ScriptedNutritionLookupProvider(
+            providerName: 'open-food-facts',
+            result: const NutritionLookupResult(
+              query: NutritionLookupQuery(foodName: 'salmon'),
+              status: NutritionLookupStatus.notFound,
+              providerName: 'open-food-facts',
+            ),
+          ),
+        ],
+        fallbackProvider: LocalNutritionLookupProvider(foods: const []),
+        cache: cache,
+      );
+
+      final result = await service.lookupFood(
+        const NutritionLookupQuery(foodName: 'salmon'),
+      );
+
+      expect(result.status, NutritionLookupStatus.verified);
+      expect(result.providerName, 'fooddata-central');
+      expect(result.food?.source.provider, 'fooddata-central');
+      expect(result.food?.source.observedAt, observedAt);
+      expect(
+        result.message,
+        contains('Used cached fooddata-central nutrition'),
+      );
+      expect(result.message, contains('open-food-facts'));
+    });
+
+    test('cache miss falls through to local not-found result', () async {
+      final service = NutritionEnrichmentService(
+        providers: [
+          _ScriptedNutritionLookupProvider(
+            providerName: 'fooddata-central',
+            result: const NutritionLookupResult(
+              query: NutritionLookupQuery(foodName: 'dragonfruit toast'),
+              status: NutritionLookupStatus.notFound,
+              providerName: 'fooddata-central',
+            ),
+          ),
+        ],
+        fallbackProvider: LocalNutritionLookupProvider(foods: const []),
+        cache: NutritionLookupCache(),
+      );
+
+      final result = await service.lookupFood(
+        const NutritionLookupQuery(foodName: 'dragonfruit toast'),
+      );
+
+      expect(result.status, NutritionLookupStatus.notFound);
+      expect(result.providerName, 'local-fallback');
+      expect(result.message, contains('No local nutrition record'));
+    });
+
+    test('fresh provider result supersedes disagreeing cached data', () async {
+      final cache = NutritionLookupCache()
+        ..write(
+          NutritionLookupResult(
+            query: const NutritionLookupQuery(foodName: 'salmon'),
+            status: NutritionLookupStatus.verified,
+            providerName: 'fooddata-central',
+            food: _foodDataCentralSalmonWithObservedAt(
+              DateTime.utc(2026, 6, 29, 8),
+            ),
+          ),
+        );
+      final service = NutritionEnrichmentService(
+        providers: [
+          _ScriptedNutritionLookupProvider(
+            providerName: 'open-food-facts',
+            result: const NutritionLookupResult(
+              query: NutritionLookupQuery(foodName: 'salmon'),
+              status: NutritionLookupStatus.verified,
+              providerName: 'open-food-facts',
+              food: _openFoodFactsSalmon,
+              message: 'Matched packaged product nutrition by barcode.',
+            ),
+          ),
+        ],
+        fallbackProvider: LocalNutritionLookupProvider(foods: const []),
+        cache: cache,
+        now: () => DateTime.utc(2026, 6, 30, 9, 30),
+      );
+
+      final result = await service.lookupFood(
+        const NutritionLookupQuery(foodName: 'salmon'),
+      );
+
+      expect(result.providerName, 'open-food-facts');
+      expect(result.food?.id, 'off-salmon');
+      expect(result.food?.source.provider, 'open-food-facts');
+      expect(result.food?.source.observedAt, DateTime.utc(2026, 6, 30, 9, 30));
+      expect(result.message, contains('Fresh open-food-facts data was used'));
+      expect(result.message, contains('cached fooddata-central data'));
+    });
+
     test('enriches AI-estimated foods with verified records', () async {
       final service = NutritionEnrichmentService(
         providers: const [
@@ -455,4 +631,79 @@ class _FakeFoodDataCentralSearchClient implements FoodDataCentralSearchClient {
     }
     return response ?? const FoodDataCentralSearchResponse(foods: []);
   }
+}
+
+class _ScriptedNutritionLookupProvider implements NutritionLookupProvider {
+  _ScriptedNutritionLookupProvider({
+    required this.providerName,
+    required this.result,
+    this.delay,
+  });
+
+  @override
+  final String providerName;
+  final NutritionLookupResult result;
+  final Duration? delay;
+
+  int lookupCount = 0;
+
+  @override
+  Future<NutritionLookupResult> lookup(NutritionLookupQuery query) async {
+    lookupCount += 1;
+    final delay = this.delay;
+    if (delay != null) {
+      await Future<void>.delayed(delay);
+    }
+    return NutritionLookupResult(
+      query: query,
+      status: result.status,
+      providerName: result.providerName,
+      food: result.food,
+      message: result.message,
+    );
+  }
+}
+
+const _foodDataCentralSalmon = FoodItem(
+  id: 'fdc-salmon',
+  name: 'Salmon, raw',
+  servingDescription: '100 g serving',
+  nutritionPerServing: MacroTotals(
+    calories: 208,
+    proteinGrams: 20.4,
+    carbsGrams: 0,
+    fatGrams: 13.4,
+  ),
+  source: SourceMetadata(
+    source: NutritionSource.databaseVerified,
+    label: 'FoodData Central',
+    provider: 'fooddata-central',
+  ),
+);
+
+const _openFoodFactsSalmon = FoodItem(
+  id: 'off-salmon',
+  name: 'Packaged salmon',
+  servingDescription: '100 g serving',
+  nutritionPerServing: MacroTotals(
+    calories: 190,
+    proteinGrams: 19,
+    carbsGrams: 1,
+    fatGrams: 11,
+  ),
+  source: SourceMetadata(
+    source: NutritionSource.databaseVerified,
+    label: 'Open Food Facts',
+    provider: 'open-food-facts',
+  ),
+);
+
+FoodItem _foodDataCentralSalmonWithObservedAt(DateTime observedAt) {
+  return FoodItem(
+    id: _foodDataCentralSalmon.id,
+    name: _foodDataCentralSalmon.name,
+    servingDescription: _foodDataCentralSalmon.servingDescription,
+    nutritionPerServing: _foodDataCentralSalmon.nutritionPerServing,
+    source: _foodDataCentralSalmon.source.copyWith(observedAt: observedAt),
+  );
 }
