@@ -103,6 +103,38 @@ void main() {
       find.textContaining('Mock AI is the default for tests and local CI'),
       findsOneWidget,
     );
+    expect(find.textContaining('Real provider mode may send'), findsOneWidget);
+    expect(
+      find.textContaining('Save only a user-owned provider token'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Me shows privacy and safety disclosures', (tester) async {
+    final repository = InMemoryAiSettingsRepository();
+
+    await _pumpMe(tester, repository);
+    await _scrollUntilVisible(
+      tester,
+      find.text('Privacy and safety disclosures'),
+    );
+
+    expect(
+      find.textContaining('not medical diagnosis or treatment'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('AI and photo estimates can be wrong'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('V1 is local-first with mock defaults'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Camera and health access stay off'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('account state starts signed out with mock auth boundary', (

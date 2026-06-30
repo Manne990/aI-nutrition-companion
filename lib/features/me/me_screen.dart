@@ -162,12 +162,34 @@ class _MeScreenState extends State<MeScreen> {
         _buildHealthConnectionCard(context),
         const SizedBox(height: 16),
         AppSectionCard(
-          title: 'Health and privacy',
+          title: 'Privacy and safety disclosures',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Health, camera, and token access remain off until a feature needs consent.',
+              const _DisclosureBullet(
+                icon: Icons.health_and_safety_outlined,
+                text:
+                    'Nutrition guidance is practical wellness support, not medical diagnosis or treatment.',
+              ),
+              const _DisclosureBullet(
+                icon: Icons.auto_awesome_outlined,
+                text:
+                    'AI and photo estimates can be wrong; confirm portions and ingredients before relying on totals.',
+              ),
+              const _DisclosureBullet(
+                icon: Icons.lock_outline,
+                text:
+                    'Provider tokens and FoodData Central keys stay on this device and are never shown again after saving.',
+              ),
+              const _DisclosureBullet(
+                icon: Icons.cloud_off_outlined,
+                text:
+                    'V1 is local-first with mock defaults, signed-out use, and no custom backend account sync.',
+              ),
+              const _DisclosureBullet(
+                icon: Icons.camera_alt_outlined,
+                text:
+                    'Camera and health access stay off until you choose a feature that needs them.',
               ),
               const SizedBox(height: AppSpacing.md),
               AppSecondaryButton(
@@ -251,6 +273,13 @@ class _MeScreenState extends State<MeScreen> {
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Real provider mode may send prompts and nutrition context to the selected provider when networking is enabled. Mock AI stays local for default use and tests.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
           const SizedBox(height: AppSpacing.md),
           Wrap(
             spacing: AppSpacing.xs,
@@ -277,6 +306,13 @@ class _MeScreenState extends State<MeScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
+          Text(
+            'Save only a user-owned provider token. It is stored locally, never displayed after saving, and can be deleted here.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           TextField(
             key: const Key('ai-provider-token-field'),
             controller: _tokenController,
@@ -463,6 +499,13 @@ class _MeScreenState extends State<MeScreen> {
                 AppChip(label: label, icon: Icons.check_circle_outline),
               for (final label in signalLabels) AppChip(label: label),
             ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Health signals are optional context for meal suggestions, not a medical record or care plan.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
           ),
           const SizedBox(height: AppSpacing.md),
           if (healthState.isConnected)
@@ -784,6 +827,28 @@ class _AiSettingsViewState {
   final AiProviderSettings settings;
   final AiTokenState tokenState;
   final FoodDataCentralKeyState foodDataCentralKeyState;
+}
+
+class _DisclosureBullet extends StatelessWidget {
+  const _DisclosureBullet({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.deepGreen),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(child: Text(text)),
+        ],
+      ),
+    );
+  }
 }
 
 abstract interface class DiagnosticsClipboard {

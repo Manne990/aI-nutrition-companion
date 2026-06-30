@@ -90,6 +90,10 @@ void main() {
       ),
     );
 
+    expect(
+      find.textContaining('Photo access starts only after you choose'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Choose photo'));
     await tester.pumpAndSettle();
 
