@@ -520,6 +520,8 @@ class _PackagedFoodLookupResult extends StatelessWidget {
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
         ),
+        const SizedBox(height: AppSpacing.xs),
+        NutritionSourceDetailsButton(metadata: food.source, title: food.name),
         const SizedBox(height: AppSpacing.sm),
         AppMetricRow(
           metrics: [
@@ -599,6 +601,11 @@ class _EstimateReview extends StatelessWidget {
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        NutritionSourceDetailsButton(
+          metadata: estimate.source,
+          title: 'Photo meal estimate',
         ),
         const SizedBox(height: AppSpacing.md),
         AppMetricRow(

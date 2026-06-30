@@ -826,6 +826,13 @@ class _MealItemProvenanceList extends StatelessWidget {
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
           ),
+          if (item.hasKnownNutrition) ...[
+            const SizedBox(height: AppSpacing.xs),
+            NutritionSourceDetailsButton(
+              metadata: item.food.source,
+              title: item.food.name,
+            ),
+          ],
           if (item != meal.items.last) const SizedBox(height: AppSpacing.xs),
         ],
       ],
