@@ -288,6 +288,18 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('not measured'), findsNothing);
+
+    await tester.tap(find.text('Source details').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nutrition source details'), findsOneWidget);
+    expect(find.text('Barcode yogurt'), findsWidgets);
+    expect(find.text('Lookup mode:'), findsOneWidget);
+    expect(find.text('Database verified'), findsOneWidget);
+    expect(find.text('Provider id:'), findsOneWidget);
+    expect(find.text('open-food-facts'), findsOneWidget);
+    expect(find.text('Confidence:'), findsOneWidget);
+    expect(find.text('95%'), findsOneWidget);
   });
 
   testWidgets('suggestion actions update visible local state', (tester) async {

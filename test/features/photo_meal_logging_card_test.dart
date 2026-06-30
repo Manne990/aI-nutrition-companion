@@ -205,6 +205,21 @@ void main() {
       find.text('Matched packaged product nutrition by barcode.'),
       findsOneWidget,
     );
+    await _ensureVisible(tester, find.text('Source details'));
+    await tester.tap(find.text('Source details'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Nutrition source details'), findsOneWidget);
+    expect(find.text('Packaged skyr cup'), findsWidgets);
+    expect(find.text('Provider id:'), findsOneWidget);
+    expect(find.text('open-food-facts'), findsOneWidget);
+    expect(find.text('Database verified:'), findsOneWidget);
+    expect(find.text('Yes'), findsOneWidget);
+    expect(find.text('Confidence:'), findsOneWidget);
+    expect(find.text('95%'), findsOneWidget);
+
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
 
     await _ensureVisible(tester, find.text('Save packaged food'));
     await tester.tap(find.text('Save packaged food'));
@@ -302,6 +317,19 @@ void main() {
         ),
         findsOneWidget,
       );
+
+      await _ensureVisible(tester, find.text('Source details'));
+      await tester.tap(find.text('Source details'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nutrition source details'), findsOneWidget);
+      expect(find.text('Fallback protein bar'), findsWidgets);
+      expect(find.text('Lookup mode:'), findsOneWidget);
+      expect(find.text('Fallback/local'), findsOneWidget);
+      expect(find.text('Provider id:'), findsOneWidget);
+      expect(find.text('local-fallback'), findsOneWidget);
+      expect(find.text('Fallback reason:'), findsOneWidget);
+      expect(find.text('Local fallback'), findsWidgets);
     },
   );
 
