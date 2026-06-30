@@ -68,6 +68,8 @@ class InMemoryNutritionRepository implements NutritionRepository {
     NutritionGoal? seedGoal,
     UserPreferences? seedPreferences,
     NutritionEnrichmentService? lookupService,
+    String? foodDataCentralApiKey,
+    FoodDataCentralSearchClient? foodDataCentralSearchClient,
   }) : _foods = List.of(seedFoods ?? NutritionSeedData.foods),
        _meals = List.of(seedMeals ?? NutritionSeedData.meals),
        _weightEntries = List.of(
@@ -77,15 +79,32 @@ class InMemoryNutritionRepository implements NutritionRepository {
        _preferences = seedPreferences ?? NutritionSeedData.preferences,
        _lookupService =
            lookupService ??
-           NutritionEnrichmentService(
-             providers: const [
-               OpenFoodFactsNutritionProvider(),
-               FoodDataCentralNutritionProvider(apiKey: null),
-             ],
-             fallbackProvider: LocalNutritionLookupProvider(
-               foods: seedFoods ?? NutritionSeedData.foods,
-             ),
+           _defaultLookupService(
+             seedFoods: seedFoods,
+             foodDataCentralApiKey: foodDataCentralApiKey,
+             foodDataCentralSearchClient: foodDataCentralSearchClient,
            );
+
+  static NutritionEnrichmentService _defaultLookupService({
+    required List<FoodItem>? seedFoods,
+    required String? foodDataCentralApiKey,
+    required FoodDataCentralSearchClient? foodDataCentralSearchClient,
+  }) {
+    return NutritionEnrichmentService(
+      providers: [
+        const OpenFoodFactsNutritionProvider(),
+        FoodDataCentralNutritionProvider(
+          apiKey: foodDataCentralApiKey,
+          client:
+              foodDataCentralSearchClient ??
+              const FoodDataCentralHttpSearchClient(),
+        ),
+      ],
+      fallbackProvider: LocalNutritionLookupProvider(
+        foods: seedFoods ?? NutritionSeedData.foods,
+      ),
+    );
+  }
 
   final List<FoodItem> _foods;
   final List<Meal> _meals;
@@ -197,6 +216,8 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     NutritionGoal? seedGoal,
     UserPreferences? seedPreferences,
     NutritionEnrichmentService? lookupService,
+    String? foodDataCentralApiKey,
+    FoodDataCentralSearchClient? foodDataCentralSearchClient,
   }) {
     final persistedState = _NutritionPersistenceState.fromRaw(
       preferences.getString(stateKey),
@@ -209,6 +230,8 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
       seedGoal: seedGoal,
       seedPreferences: seedPreferences,
       lookupService: lookupService,
+      foodDataCentralApiKey: foodDataCentralApiKey,
+      foodDataCentralSearchClient: foodDataCentralSearchClient,
     );
   }
 
@@ -220,6 +243,8 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     super.seedGoal,
     super.seedPreferences,
     super.lookupService,
+    super.foodDataCentralApiKey,
+    super.foodDataCentralSearchClient,
   });
 
   static const stateKey = 'nutrition.state.v1';
@@ -235,6 +260,8 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     NutritionGoal? seedGoal,
     UserPreferences? seedPreferences,
     NutritionEnrichmentService? lookupService,
+    String? foodDataCentralApiKey,
+    FoodDataCentralSearchClient? foodDataCentralSearchClient,
   }) async {
     final preferences = await SharedPreferences.getInstance();
     return SharedPreferencesNutritionRepository(
@@ -245,6 +272,8 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
       seedGoal: seedGoal,
       seedPreferences: seedPreferences,
       lookupService: lookupService,
+      foodDataCentralApiKey: foodDataCentralApiKey,
+      foodDataCentralSearchClient: foodDataCentralSearchClient,
     );
   }
 

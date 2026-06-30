@@ -21,6 +21,8 @@ abstract interface class AiSettingsRepository {
 
   Future<FoodDataCentralKeyState> loadFoodDataCentralKeyState();
 
+  Future<String?> readFoodDataCentralKey();
+
   Future<void> saveFoodDataCentralKey(String apiKey);
 
   Future<void> deleteFoodDataCentralKey();
@@ -209,6 +211,17 @@ class SharedPreferencesAiSettingsRepository implements AiSettingsRepository {
   }
 
   @override
+  Future<String?> readFoodDataCentralKey() async {
+    try {
+      final apiKey = await foodDataCentralKeyStorage.readToken();
+      final trimmed = apiKey?.trim();
+      return trimmed == null || trimmed.isEmpty ? null : trimmed;
+    } on Object {
+      return null;
+    }
+  }
+
+  @override
   Future<void> saveFoodDataCentralKey(String apiKey) async {
     final trimmed = apiKey.trim();
     if (trimmed.isEmpty) {
@@ -323,6 +336,13 @@ class InMemoryAiSettingsRepository implements AiSettingsRepository {
       isSecureStorage: _foodDataCentralKeyStorage.isSecureStorage,
       storageLabel: _foodDataCentralKeyStorage.storageLabel,
     );
+  }
+
+  @override
+  Future<String?> readFoodDataCentralKey() async {
+    final apiKey = await _foodDataCentralKeyStorage.readToken();
+    final trimmed = apiKey?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   @override

@@ -17,6 +17,7 @@ import '../features/today/today_screen.dart';
 import '../services/adapters/ai_chat_adapter.dart';
 import '../services/adapters/meal_recognition_adapter.dart';
 import '../services/adapters/nutrition_companion_adapter.dart';
+import '../services/adapters/nutrition_lookup_adapters.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -27,6 +28,7 @@ class AppShell extends StatefulWidget {
     required this.healthRepository,
     required this.aiChatRepository,
     this.nutritionRepository,
+    this.foodDataCentralSearchClient,
   });
 
   final OnboardingRepository onboardingRepository;
@@ -35,6 +37,7 @@ class AppShell extends StatefulWidget {
   final HealthRepository healthRepository;
   final AiChatRepository aiChatRepository;
   final NutritionRepository? nutritionRepository;
+  final FoodDataCentralSearchClient? foodDataCentralSearchClient;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -228,6 +231,7 @@ class _AppShellState extends State<AppShell> {
       _aiConfigurationFuture = widget.aiSettingsRepository
           .loadAdapterConfiguration();
       _runtimeStateFuture = _loadRuntimeState();
+      _nutritionRepositoryProfile = null;
     });
   }
 
@@ -280,6 +284,9 @@ class _AppShellState extends State<AppShell> {
     return SharedPreferencesNutritionRepository.create(
       seedGoal: profile.toNutritionGoal(calories: 2200),
       seedPreferences: profile.toUserPreferences(),
+      foodDataCentralApiKey: await widget.aiSettingsRepository
+          .readFoodDataCentralKey(),
+      foodDataCentralSearchClient: widget.foodDataCentralSearchClient,
     );
   }
 
