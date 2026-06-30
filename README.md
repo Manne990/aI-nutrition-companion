@@ -82,7 +82,18 @@ bash scripts/local_ci.sh
 ```
 
 The full local CI command runs dependency resolution, format checking, static
-analysis, and tests.
+analysis, shell checks, and tests.
+
+Release configuration verification:
+
+```sh
+bash scripts/release_verify.sh
+```
+
+The default release verification path checks Android and iOS release
+configuration without private signing credentials. Optional release build
+checks are available with `--android-build`, `--ios-build`, or `--all-builds`
+when the local machine has the required signing and platform toolchains.
 
 ## Release Readiness
 
@@ -90,8 +101,8 @@ V1 store-preparation guidance lives in
 [`docs/release-readiness.md`](docs/release-readiness.md). It tracks the
 remaining App Store and Google Play work, privacy policy requirements,
 nutrition/AI disclaimer placement, user-provided token disclosures, future
-health-data considerations, release build commands, screenshot/metadata needs,
-and the pre-submission test matrix.
+health-data considerations, agent-runnable release verification commands,
+screenshot/metadata needs, and the pre-submission test matrix.
 
 ## Environment Variables
 

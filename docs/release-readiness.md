@@ -55,6 +55,8 @@ Current app facts from this repository:
   entitlement, Android Health Connect permission, or native bridge is enabled
   yet. See `docs/health-data-scaffolding.md`.
 - Local CI is `bash scripts/local_ci.sh`.
+- Agent-runnable release configuration verification is
+  `bash scripts/release_verify.sh`.
 
 ## Must Fix Before Store Submission
 
@@ -124,8 +126,16 @@ Local verification:
 flutter pub get
 flutter analyze
 flutter test
-flutter build ios --release
+bash scripts/release_verify.sh
+flutter build ios --release --no-codesign
 ```
+
+The script checks the committed iOS bundle id and signing-team boundary without
+requiring a private Apple team id. The optional command
+`bash scripts/release_verify.sh --ios-build` runs the no-codesign release build
+when macOS, Xcode, CocoaPods, Flutter, and the iOS CocoaPods project files are
+available. It fails with explicit guidance if Xcode, CocoaPods, `ios/Podfile`,
+or other local prerequisites are missing.
 
 Archive and upload from Xcode when signing is configured:
 
@@ -208,8 +218,17 @@ Local verification:
 flutter pub get
 flutter analyze
 flutter test
+bash scripts/release_verify.sh
 flutter build appbundle --release
 ```
+
+The script checks Android release configuration without requiring upload
+signing secrets. The optional command
+`bash scripts/release_verify.sh --android-build` runs the release app-bundle
+build only when signing inputs are supplied outside source control through
+`android/key.properties`, Gradle properties, or the `AI_NUTRITION_UPLOAD_*`
+environment variables. If signing is missing, the script explains the missing
+inputs instead of falling back to debug signing.
 
 Before creating an app bundle:
 
@@ -396,6 +415,7 @@ Run the matrix before public testing or production submission.
 | Area | iOS | Android | Expected result |
 | --- | --- | --- | --- |
 | Local CI | `bash scripts/local_ci.sh` | `bash scripts/local_ci.sh` | Format, analyze, and tests pass. |
+| Release config check | `bash scripts/release_verify.sh` | `bash scripts/release_verify.sh` | Release identifiers, signing boundaries, and toolchain prerequisites are reported without private secrets. |
 | Debug launch | Simulator and physical device when available | Emulator and physical device when available | App opens to expected first-run or Today state. |
 | Release build | `flutter build ios --release` | `flutter build appbundle --release` | Build completes with production identifiers and signing. |
 | Small phone | iPhone SE size | 360 x 640 class emulator | Text, cards, and bottom nav do not overlap. |
