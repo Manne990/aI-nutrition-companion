@@ -16,7 +16,7 @@ production values before public testing or production submission.
 - Default mode: local mock companion, mock AI responses, deterministic mock
   meal recognition, local nutrition data, and local-first app state.
 - Backend: no custom backend exists in this repository.
-- Accounts: mock local auth only; no real account provider or cloud sync.
+- Accounts: local account gate only; no remote account provider or cloud sync.
 - Nutrition lookup: deterministic local/mock defaults unless a user-provided
   or runtime-injected provider key is available.
 - AI provider tokens: user-provided tokens are optional and must not be

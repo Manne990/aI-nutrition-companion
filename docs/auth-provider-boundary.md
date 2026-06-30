@@ -3,13 +3,14 @@
 Status: V1 auth boundary for issue #38
 
 AI Nutrition Companion V1 has a provider-neutral auth boundary without a custom
-backend. The runnable implementation is mock local auth so tests, local CI, and
-signed-out product flows remain deterministic.
+backend. The runnable implementation is a local account gate so tests, local CI,
+and first-run product access remain deterministic.
 
 ## V1 Direction
 
-- Keep signed-out use as the default product state.
-- Keep mock local auth as the default implementation for tests and development.
+- Require a local account before the Today, Kitchen, and Me tabs are reachable.
+- Keep local account storage as the default implementation for tests and
+  development.
 - Model Firebase Auth and Supabase Auth as future provider options, not active
   SDK integrations.
 - Do not commit a Firebase project config, Supabase project URL, publishable key,
@@ -27,16 +28,20 @@ a backend.
 
 The current boundary is:
 
-- `AuthAccountState`: signed-out, signed-in mock, or provider-unavailable state.
-- `AuthRepository`: loads account state, signs into mock auth, signs out, and
-  records provider-unavailable state.
+- `AuthAccountState`: signed-out, signed-in local, or provider-unavailable
+  state.
+- `LocalAccountRecord`: stores the device-local email, display name, and
+  creation timestamp used by the V1 account gate.
+- `AuthRepository`: loads account state, registers a local account, validates
+  local sign-in, signs out, and records provider-unavailable state.
 - `AuthProviderAdapter`: provider-facing adapter seam for Firebase Auth,
-  Supabase Auth, or mock auth.
-- `MockAuthProviderAdapter`: local deterministic adapter used by V1 tests and
-  the default app path.
+  Supabase Auth, or the local V1 boundary.
+- `LocalAuthProviderAdapter`: deterministic adapter used by V1 tests and the
+  default app path.
 
-The Me tab exposes the account state and lets a user enter or leave the mock
-local account. This is a small account state surface, not a full account system.
+The account entry screen gates app access. Register creates the local account
+and starts onboarding; sign-in validates against the existing local account.
+The Me tab exposes the signed-in account state and logout action.
 
 ## Firebase Auth Notes
 
@@ -76,10 +81,11 @@ No Supabase service-role or secret key belongs in the mobile app.
 
 Local tests cover:
 
-- signed-out mock default state
-- signed-in mock state
+- signed-out local account state
+- signed-in local account state
 - provider-unavailable state
-- existing onboarding and local app flows while signed out
+- fresh launch blocked before product tabs
+- registration to onboarding and local-account sign-in flows
 
 Run:
 

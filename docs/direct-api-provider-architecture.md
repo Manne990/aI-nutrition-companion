@@ -140,8 +140,8 @@ authorization depends on IAM, Security Rules, and App Check rather than hiding
 the client key.
 
 For V1, choose Firebase Auth only after accepting the Firebase project
-configuration and store-disclosure surface. Keep signed-out and mock auth paths
-working because nutrition logs remain local unless a separate sync feature is
+configuration and store-disclosure surface. Keep the local account gate working
+because nutrition logs remain local unless a separate sync feature is
 implemented.
 
 ### Supabase Auth
@@ -178,8 +178,8 @@ offline behavior.
 ## Documentation Dependencies
 
 - `docs/auth-provider-boundary.md` records the V1 provider-neutral auth seam and
-  keeps mock local auth as the default until a real Firebase or Supabase project
-  is intentionally introduced.
+  keeps the local account gate as the default until a real Firebase or Supabase
+  project is intentionally introduced.
 - `docs/ai-provider-settings.md` remains the user-token storage boundary for AI
   providers and should be extended for FoodData Central user keys if #39 adds
   nutrition credentials.

@@ -117,8 +117,8 @@ backend or proxy before production use.
 
 The V1 auth boundary is documented in
 [`docs/auth-provider-boundary.md`](docs/auth-provider-boundary.md). The default
-implementation is mock local auth with signed-out use preserved; no Firebase,
-Supabase, OAuth, or backend credential is required for local development.
+implementation is a local account gate; no Firebase, Supabase, OAuth, or
+backend credential is required for local development.
 
 The FoodData Central adapter contract reports an explicit missing-configuration
 fallback state until a build or app runtime supplies a data.gov key. The V1

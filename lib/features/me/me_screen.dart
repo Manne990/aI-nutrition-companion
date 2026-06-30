@@ -182,7 +182,7 @@ class _MeScreenState extends State<MeScreen> {
               const _DisclosureBullet(
                 icon: Icons.cloud_off_outlined,
                 text:
-                    'V1 is local-first with signed-out use and no custom backend account sync.',
+                    'V1 accounts are local to this device; no custom backend account sync is enabled.',
               ),
               const _DisclosureBullet(
                 icon: Icons.camera_alt_outlined,
@@ -455,21 +455,14 @@ class _MeScreenState extends State<MeScreen> {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          if (authState.isSignedIn)
-            AppSecondaryButton(
-              label: 'Sign out',
-              icon: Icons.logout,
-              onPressed: _signOut,
-            )
-          else
-            AppPrimaryButton(
-              label: 'Use mock account',
-              icon: Icons.login,
-              onPressed: _signInWithMock,
-            ),
+          AppSecondaryButton(
+            label: 'Sign out',
+            icon: Icons.logout,
+            onPressed: authState.isSignedIn ? _signOut : null,
+          ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Firebase Auth or Supabase Auth can replace this boundary later. V1 does not include a real auth project, custom backend, or nutrition sync.',
+            'Firebase Auth or Supabase Auth can replace this boundary later. V1 does not include a remote auth project, custom backend, or nutrition sync.',
             style: Theme.of(
               context,
             ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
@@ -664,14 +657,6 @@ class _MeScreenState extends State<MeScreen> {
       _tokenController.clear();
       _statusMessage = 'Token deleted from this device.';
       _aiSettingsFuture = _loadAiSettings();
-    });
-  }
-
-  Future<void> _signInWithMock() async {
-    final nextState = await widget.authRepository.signInWithMock();
-    await widget.onAuthStateChanged();
-    setState(() {
-      _authState = nextState;
     });
   }
 

@@ -3,30 +3,76 @@ import 'package:ai_nutrition_companion/domain/repositories/auth_repository.dart'
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('auth repository defaults to signed out mock state', () async {
+  test('auth repository defaults to signed out local account state', () async {
     final repository = InMemoryAuthRepository();
 
     final state = await repository.loadState();
 
     expect(state.status, AuthConnectionStatus.signedOut);
-    expect(state.provider, AuthProvider.mock);
-    expect(state.explainer, contains('Use the app signed out'));
+    expect(state.provider, AuthProvider.local);
+    expect(state.explainer, contains('Sign in or register'));
   });
 
-  test('mock sign-in and sign-out preserve local-only boundary', () async {
+  test(
+    'register, sign in, and sign out preserve local-only boundary',
+    () async {
+      final repository = InMemoryAuthRepository();
+
+      final registered = await repository.registerLocalAccount(
+        email: 'PERSON@example.com',
+        displayName: 'Person Name',
+      );
+
+      expect(registered.status, AuthConnectionStatus.signedIn);
+      expect(registered.provider, AuthProvider.local);
+      expect(registered.userLabel, 'Person Name');
+      expect(registered.explainer, contains('local to this device'));
+      expect(
+        (await repository.loadLocalAccount())?.normalizedEmail,
+        'person@example.com',
+      );
+
+      await repository.signOut();
+      final signIn = await repository.signInLocalAccount(
+        email: 'person@example.com',
+      );
+
+      expect(signIn.isSuccess, isTrue);
+      expect(signIn.state.status, AuthConnectionStatus.signedIn);
+      expect(signIn.state.userLabel, 'Person Name');
+
+      final signedOut = await repository.signOut();
+
+      expect(signedOut.status, AuthConnectionStatus.signedOut);
+      expect(signedOut.provider, AuthProvider.local);
+    },
+  );
+
+  test('sign in reports missing or invalid local credentials', () async {
     final repository = InMemoryAuthRepository();
 
-    final signedIn = await repository.signInWithMock();
+    final missing = await repository.signInLocalAccount(
+      email: 'person@example.com',
+    );
 
-    expect(signedIn.status, AuthConnectionStatus.signedIn);
-    expect(signedIn.provider, AuthProvider.mock);
-    expect(signedIn.userLabel, 'Local mock user');
-    expect(signedIn.explainer, contains('Nutrition logs still stay'));
+    expect(missing.isSuccess, isFalse);
+    expect(
+      missing.errorMessage,
+      'No local account exists yet. Register first.',
+    );
 
-    final signedOut = await repository.signOut();
+    await repository.registerLocalAccount(
+      email: 'person@example.com',
+      displayName: 'Person Name',
+    );
+    await repository.signOut();
 
-    expect(signedOut.status, AuthConnectionStatus.signedOut);
-    expect(signedOut.provider, AuthProvider.mock);
+    final invalid = await repository.signInLocalAccount(
+      email: 'other@example.com',
+    );
+
+    expect(invalid.isSuccess, isFalse);
+    expect(invalid.errorMessage, 'No local account matches that email.');
   });
 
   test(
