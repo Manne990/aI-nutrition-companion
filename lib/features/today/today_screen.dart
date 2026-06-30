@@ -584,6 +584,8 @@ class _DailyNutritionOverviewCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.sm),
+          _NutritionProvenanceSummary(summary: summary),
           const SizedBox(height: AppSpacing.md),
           _ProteinProgress(summary: summary),
           const SizedBox(height: AppSpacing.md),
@@ -681,6 +683,55 @@ class _ProteinProgress extends StatelessWidget {
   }
 }
 
+class _NutritionProvenanceSummary extends StatelessWidget {
+  const _NutritionProvenanceSummary({required this.summary});
+
+  final DailySummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final items = _summaryItems(summary);
+    if (items.isEmpty) {
+      return Text(
+        'Nutrition source details appear after the first meal is logged.',
+        style: Theme.of(
+          context,
+        ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+      );
+    }
+
+    final knownSources = _uniqueKnownSources(items);
+    final hasUnknown = items.any((item) => !item.hasKnownNutrition);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final source in knownSources)
+              SourceChip.fromMetadata(metadata: source),
+            if (hasUnknown)
+              const AppChip(
+                label: 'Unknown nutrition source',
+                icon: Icons.help_outline,
+                tone: AppChipTone.accent,
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Text(
+          _provenanceSummaryCopy(items),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+        ),
+      ],
+    );
+  }
+}
+
 class _DecisionSupport extends StatelessWidget {
   const _DecisionSupport({required this.summary});
 
@@ -740,6 +791,48 @@ class _MealHistory extends StatelessWidget {
   }
 }
 
+class _MealItemProvenanceList extends StatelessWidget {
+  const _MealItemProvenanceList({required this.meal});
+
+  final Meal meal;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in meal.items) ...[
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (item.hasKnownNutrition)
+                SourceChip.fromMetadata(metadata: item.food.source)
+              else
+                const AppChip(
+                  label: 'Unknown nutrition source',
+                  icon: Icons.help_outline,
+                  tone: AppChipTone.accent,
+                ),
+              if (item.source.source == NutritionSource.userConfirmed)
+                SourceChip.fromMetadata(metadata: item.source),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            _itemProvenanceCopy(item),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
+          if (item != meal.items.last) const SizedBox(height: AppSpacing.xs),
+        ],
+      ],
+    );
+  }
+}
+
 class _MealHistoryRow extends StatelessWidget {
   const _MealHistoryRow({required this.meal});
 
@@ -774,10 +867,12 @@ class _MealHistoryRow extends StatelessWidget {
               if (meal.hasMissingNutrition) ...[
                 const SizedBox(height: AppSpacing.xxs),
                 const Text(
-                  'Includes an item that still needs confirmation.',
+                  'Includes an item with an unknown nutrition source.',
                   style: TextStyle(color: AppColors.mutedInk, fontSize: 12),
                 ),
               ],
+              const SizedBox(height: AppSpacing.xs),
+              _MealItemProvenanceList(meal: meal),
             ],
           ),
         ),
@@ -966,7 +1061,7 @@ class _QuickLogSuggestionRow extends StatelessWidget {
                   icon: Icons.kitchen_outlined,
                 ),
                 AppChip(
-                  label: suggestion.source.label ?? 'Habit suggestion',
+                  label: nutritionSourceLabel(suggestion.source),
                   tone: AppChipTone.inverse,
                   icon: Icons.auto_awesome,
                 ),
@@ -1031,7 +1126,7 @@ String _sourceStateLabel(DailySummary summary) {
     return 'No sources yet';
   }
   if (summary.hasMissingNutrition) {
-    return 'Needs confirmation';
+    return 'Source gap';
   }
   final hasEstimates = summary.meals
       .expand((meal) => meal.items)
@@ -1043,6 +1138,68 @@ String _sourceStateLabel(DailySummary summary) {
             item.food.source.source == NutritionSource.fallback,
       );
   return hasEstimates ? 'Mixed sources' : 'Confirmed data';
+}
+
+List<MealItem> _summaryItems(DailySummary summary) {
+  return summary.meals.expand((meal) => meal.items).toList(growable: false);
+}
+
+List<SourceMetadata> _uniqueKnownSources(List<MealItem> items) {
+  final sources = <SourceMetadata>[];
+  final seen = <String>{};
+  for (final item in items) {
+    if (!item.hasKnownNutrition) {
+      continue;
+    }
+    final source = item.food.source;
+    final key = [
+      source.source.name,
+      source.provider ?? '',
+      source.label ?? '',
+    ].join('|');
+    if (seen.add(key)) {
+      sources.add(source);
+    }
+  }
+  return sources;
+}
+
+String _provenanceSummaryCopy(List<MealItem> items) {
+  if (items.any(_hasProviderUnavailableSource)) {
+    return 'A provider was unavailable, so fallback values are marked for review instead of hidden.';
+  }
+  if (items.any((item) => !item.hasKnownNutrition)) {
+    return 'Some nutrition values have an unknown source; confirm them before relying on exact totals.';
+  }
+  if (items.any(
+    (item) => item.food.source.source == NutritionSource.fallback,
+  )) {
+    return 'Fallback values keep meal decisions moving; confirm details when precision matters.';
+  }
+  if (items.any(
+    (item) => item.food.source.source == NutritionSource.aiEstimated,
+  )) {
+    return 'AI-estimated values are useful for direction, not medical certainty.';
+  }
+  return 'Provider and confirmation sources are visible for the nutrition values shown today.';
+}
+
+String _itemProvenanceCopy(MealItem item) {
+  if (!item.hasKnownNutrition) {
+    return '${item.food.name}: Unknown nutrition source; add or confirm values before relying on totals.';
+  }
+  final detail = nutritionSourceDetail(item.food.source);
+  if (_hasProviderUnavailableSource(item)) {
+    return '${item.food.name}: Provider unavailable; using marked fallback values.';
+  }
+  return '${item.food.name}: $detail';
+}
+
+bool _hasProviderUnavailableSource(MealItem item) {
+  final label = item.food.source.label?.toLowerCase() ?? '';
+  return label.contains('provider unavailable') ||
+      label.contains('missing key') ||
+      label.contains('missing api key');
 }
 
 String _macroGoalLabel(double current, double? goal, String unit) {

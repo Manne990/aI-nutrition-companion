@@ -315,7 +315,7 @@ class _EstimateReview extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-            SourceChip(source: estimate.source.source),
+            SourceChip.fromMetadata(metadata: estimate.source),
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -401,7 +401,9 @@ class _EditableMealItemFields extends StatelessWidget {
           children: [
             Row(
               children: [
-                Expanded(child: SourceChip(source: draft.source.source)),
+                Expanded(
+                  child: SourceChip.fromMetadata(metadata: draft.source),
+                ),
                 IconButton(
                   tooltip: 'Remove ${draft.name}',
                   onPressed: () => onRemove(draft),

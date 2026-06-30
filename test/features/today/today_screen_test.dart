@@ -107,7 +107,7 @@ void main() {
     expect(find.text('Daily overview'), findsOneWidget);
     expect(find.text('65 / 110 g'), findsOneWidget);
     expect(find.text('716 / 2200 kcal'), findsOneWidget);
-    expect(find.text('Needs confirmation'), findsOneWidget);
+    expect(find.text('Source gap'), findsOneWidget);
 
     await _scrollUntilVisible(tester, find.text('Skyr bowl with berries'));
 
@@ -123,6 +123,171 @@ void main() {
     );
 
     expect(find.textContaining('You are about 45g short'), findsOneWidget);
+  });
+
+  testWidgets('Today shows provider provenance and source gaps', (
+    tester,
+  ) async {
+    const openFoodFactsFood = FoodItem(
+      id: 'off-yogurt',
+      name: 'Barcode yogurt',
+      servingDescription: '150 g cup',
+      nutritionPerServing: MacroTotals(
+        calories: 120,
+        proteinGrams: 14,
+        carbsGrams: 10,
+        fatGrams: 2,
+      ),
+      source: SourceMetadata(
+        source: NutritionSource.databaseVerified,
+        label: 'Open Food Facts barcode match',
+        provider: 'open-food-facts',
+        confidence: 0.95,
+      ),
+    );
+    const foodDataCentralFood = FoodItem(
+      id: 'fdc-salmon',
+      name: 'Salmon',
+      servingDescription: '100 g cooked',
+      nutritionPerServing: MacroTotals(
+        calories: 208,
+        proteinGrams: 22,
+        carbsGrams: 0,
+        fatGrams: 13,
+      ),
+      source: SourceMetadata(
+        source: NutritionSource.databaseVerified,
+        label: 'FoodData Central generic match',
+        provider: 'fooddata-central',
+        confidence: 0.96,
+      ),
+    );
+    const fallbackFood = FoodItem(
+      id: 'fallback-wrap',
+      name: 'Local wrap',
+      servingDescription: '1 wrap',
+      nutritionPerServing: MacroTotals(
+        calories: 360,
+        proteinGrams: 20,
+        carbsGrams: 42,
+        fatGrams: 12,
+      ),
+      source: SourceMetadata(
+        source: NutritionSource.fallback,
+        label: 'Provider unavailable: FoodData Central missing key',
+        provider: 'local-fallback',
+      ),
+    );
+    const userConfirmedFood = FoodItem(
+      id: 'manual-shake',
+      name: 'Manual shake',
+      servingDescription: '1 bottle',
+      nutritionPerServing: MacroTotals(
+        calories: 180,
+        proteinGrams: 30,
+        carbsGrams: 8,
+        fatGrams: 3,
+      ),
+      source: SourceMetadata(
+        source: NutritionSource.userConfirmed,
+        label: 'User-confirmed',
+      ),
+    );
+    const unknownFood = FoodItem(
+      id: 'unknown-sauce',
+      name: 'Unknown sauce',
+      servingDescription: '1 spoonful',
+      source: SourceMetadata(
+        source: NutritionSource.aiEstimated,
+        label: 'AI estimate',
+        provider: 'mock-ai',
+      ),
+    );
+    final repository = InMemoryNutritionRepository(
+      seedMeals: [
+        Meal(
+          id: 'provider-meal',
+          name: 'Provider plate',
+          eatenAt: DateTime(2026, 6, 29, 12),
+          source: NutritionSeedData.userSource,
+          items: const [
+            MealItem(
+              id: 'off-yogurt-item',
+              food: openFoodFactsFood,
+              servings: 1,
+              source: NutritionSeedData.userSource,
+            ),
+            MealItem(
+              id: 'fdc-salmon-item',
+              food: foodDataCentralFood,
+              servings: 1,
+              source: NutritionSeedData.userSource,
+            ),
+            MealItem(
+              id: 'fallback-wrap-item',
+              food: fallbackFood,
+              servings: 1,
+              source: NutritionSeedData.aiSource,
+            ),
+            MealItem(
+              id: 'manual-shake-item',
+              food: userConfirmedFood,
+              servings: 1,
+              source: NutritionSeedData.userSource,
+            ),
+            MealItem(
+              id: 'unknown-sauce-item',
+              food: unknownFood,
+              servings: 1,
+              source: NutritionSeedData.aiSource,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        TodayScreen(
+          profile: profile,
+          adapter: const _FixtureAdapter([]),
+          repository: repository,
+          now: DateTime(2026, 6, 29, 15, 30),
+        ),
+      ),
+    );
+
+    expect(find.text('Source gap'), findsOneWidget);
+    expect(find.text('Open Food Facts'), findsWidgets);
+    expect(find.text('FoodData Central'), findsWidgets);
+    expect(find.text('Local fallback'), findsWidgets);
+    expect(find.text('User-confirmed'), findsWidgets);
+    expect(find.text('Unknown nutrition source'), findsWidgets);
+    expect(find.textContaining('provider was unavailable'), findsOneWidget);
+
+    await _scrollUntilVisible(
+      tester,
+      find.textContaining('Barcode yogurt: Open Food Facts nutrition source'),
+    );
+
+    expect(find.textContaining('Confidence 95%.'), findsOneWidget);
+    expect(
+      find.textContaining('Salmon: FoodData Central nutrition source'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Local wrap: Provider unavailable'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Manual shake: User-confirmed values'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Unknown sauce: Unknown nutrition source'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('not measured'), findsNothing);
   });
 
   testWidgets('suggestion actions update visible local state', (tester) async {
