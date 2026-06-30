@@ -79,6 +79,26 @@ Every direct provider implementation should preserve these constraints:
 - Re-check provider docs before production release because direct-use terms,
   quotas, and key handling guidance can change.
 
+## V1 Nutrition Lookup Policy
+
+The V1 lookup service uses explicit provider ordering instead of hidden runtime
+branching:
+
+- Barcode lookups should prefer Open Food Facts before generic-food providers.
+- Generic food search should prefer FoodData Central when a user-provided or
+  runtime-injected key is available, then local fallback.
+- Provider errors, malformed data, missing credentials, and timeouts are source
+  gaps. They should be carried into fallback messages rather than treated as
+  empty nutrition.
+- Successful external lookups may be cached only when the cached food preserves
+  provider identity and an observed timestamp in `SourceMetadata`.
+- Cache is a resilience fallback, not a freshness authority. Fresh provider
+  results are checked before cache hits, and a fresh verified result supersedes
+  a disagreeing cached result.
+- Local fallback can explain why a provider was unavailable, but it remains
+  fallback nutrition until the user confirms or a verified provider supplies
+  facts.
+
 ## Service Notes
 
 ### Open Food Facts
