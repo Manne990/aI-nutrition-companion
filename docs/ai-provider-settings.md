@@ -43,9 +43,9 @@ Do not commit:
 - screenshots or logs that expose provider tokens
 - screenshots or logs that expose provider keys
 
-Mock AI remains the default for local development and CI. Real provider calls
-remain stubbed behind adapter configuration until explicit network-provider work
-is added.
+Mock AI remains the default for local development and CI. Real provider chat
+calls are available only after the user selects a real provider and saves a
+user-owned token; tests use injected transports and do not make live calls.
 
 ## User Controls
 

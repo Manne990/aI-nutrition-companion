@@ -41,6 +41,7 @@ void main() {
       expect(configuration.tokenState.hasToken, isTrue);
       expect(configuration.canUseRealProvider, isTrue);
       expect(configuration.shouldUseMock, isFalse);
+      expect(await repository.readProviderToken(), 'entered provider value');
 
       await repository.saveToken('updated provider value');
       expect((await repository.loadTokenState()).hasToken, isTrue);
@@ -135,6 +136,7 @@ void main() {
 
       expect(settings, AiProviderSettings.defaults);
       expect((await repository.loadTokenState()).hasToken, isTrue);
+      expect(await repository.readProviderToken(), 'stored provider value');
       expect(
         preferences
             .getString(SharedPreferencesAiSettingsRepository.settingsKey)
@@ -159,6 +161,24 @@ void main() {
       expect(await repository.loadSettings(), AiProviderSettings.defaults);
     },
   );
+
+  test('real provider selection does not silently become mock mode', () async {
+    const configuration = AiAdapterConfiguration(
+      settings: AiProviderSettings(
+        provider: AiProvider.openai,
+        model: 'gpt-4.1-mini',
+      ),
+      tokenState: AiTokenState(
+        hasToken: false,
+        isSecureStorage: true,
+        storageLabel: 'test secure storage',
+      ),
+    );
+
+    expect(configuration.canUseRealProvider, isFalse);
+    expect(configuration.shouldUseMock, isFalse);
+    expect(configuration.modeLabel, 'OpenAI needs token');
+  });
 
   test(
     'shared preferences repository falls back for incompatible setting fields',
