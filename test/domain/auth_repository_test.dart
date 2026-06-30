@@ -41,6 +41,17 @@ void main() {
       expect(signIn.state.status, AuthConnectionStatus.signedIn);
       expect(signIn.state.userLabel, 'Person Name');
 
+      final updated = await repository.updateLocalAccount(
+        email: 'UPDATED@example.com',
+        displayName: 'Updated Person',
+      );
+
+      expect(updated.userLabel, 'Updated Person');
+      expect(
+        (await repository.loadLocalAccount())?.normalizedEmail,
+        'updated@example.com',
+      );
+
       final signedOut = await repository.signOut();
 
       expect(signedOut.status, AuthConnectionStatus.signedOut);

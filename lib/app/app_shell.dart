@@ -59,6 +59,7 @@ class _AppShellState extends State<AppShell> {
     ({
       AiAdapterConfiguration ai,
       AuthAccountState auth,
+      LocalAccountRecord? account,
       HealthConnectionState health,
     })
   >
@@ -111,6 +112,7 @@ class _AppShellState extends State<AppShell> {
           ({
             AiAdapterConfiguration ai,
             AuthAccountState auth,
+            LocalAccountRecord? account,
             HealthConnectionState health,
           })
         >(
@@ -126,6 +128,7 @@ class _AppShellState extends State<AppShell> {
 
             final aiConfiguration = runtimeSnapshot.requireData.ai;
             final authState = runtimeSnapshot.requireData.auth;
+            final account = runtimeSnapshot.requireData.account;
             final healthState = runtimeSnapshot.requireData.health;
             if (!authState.isSignedIn) {
               return AccountEntryScreen(
@@ -137,7 +140,14 @@ class _AppShellState extends State<AppShell> {
             _profile ??= snapshot.data;
             final profile = _profile;
             if (profile == null) {
-              return OnboardingScreen(onCompleted: _completeOnboarding);
+              return OnboardingScreen(
+                initialAccount: account,
+                initialAiSettings: aiConfiguration.settings,
+                aiTokenState: aiConfiguration.tokenState,
+                onAccountDetailsSaved: _saveOnboardingAccountDetails,
+                onAiSettingsSaved: _saveOnboardingAiSettings,
+                onCompleted: _completeOnboarding,
+              );
             }
 
             _ensureNutritionRepository(profile);
@@ -232,6 +242,30 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  Future<void> _saveOnboardingAccountDetails({
+    required String email,
+    required String displayName,
+  }) async {
+    final authState = await widget.authRepository.updateLocalAccount(
+      email: email,
+      displayName: displayName,
+    );
+    _authStateFuture = Future.value(authState);
+  }
+
+  Future<void> _saveOnboardingAiSettings({
+    required AiProviderSettings settings,
+    String? token,
+  }) async {
+    await widget.aiSettingsRepository.saveSettings(settings);
+    final trimmedToken = token?.trim();
+    if (trimmedToken != null && trimmedToken.isNotEmpty) {
+      await widget.aiSettingsRepository.saveToken(trimmedToken);
+    }
+    _aiConfigurationFuture = widget.aiSettingsRepository
+        .loadAdapterConfiguration();
+  }
+
   Future<String?> _registerLocalAccount({
     required String email,
     required String displayName,
@@ -302,6 +336,7 @@ class _AppShellState extends State<AppShell> {
     ({
       AiAdapterConfiguration ai,
       AuthAccountState auth,
+      LocalAccountRecord? account,
       HealthConnectionState health,
     })
   >
@@ -309,6 +344,7 @@ class _AppShellState extends State<AppShell> {
     return (
       ai: await _aiConfigurationFuture,
       auth: await _authStateFuture,
+      account: await widget.authRepository.loadLocalAccount(),
       health: await _healthStateFuture,
     );
   }

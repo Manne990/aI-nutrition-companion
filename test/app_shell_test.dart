@@ -1,5 +1,6 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
 import 'package:ai_nutrition_companion/app/service_credentials.dart';
+import 'package:ai_nutrition_companion/domain/models/ai_settings.dart';
 import 'package:ai_nutrition_companion/domain/models/auth.dart';
 import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
@@ -96,6 +97,11 @@ Future<void> _pumpApp(
               status: AuthConnectionStatus.signedIn,
               provider: AuthProvider.local,
               userLabel: 'Returning user',
+            ),
+            initialAccount: LocalAccountRecord(
+              email: 'returning@example.com',
+              displayName: 'Returning user',
+              createdAt: DateTime(2026, 6, 29),
             ),
           ),
       healthRepository: healthRepository ?? InMemoryHealthRepository(),
@@ -220,7 +226,7 @@ void main() {
     expect(find.text('Me'), findsOneWidget);
   });
 
-  testWidgets('register creates a local account and starts onboarding', (
+  testWidgets('register starts onboarding with account details first', (
     tester,
   ) async {
     final authRepository = InMemoryAuthRepository();
@@ -239,7 +245,10 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Register'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Set your direction'), findsOneWidget);
+    expect(find.text('Account details'), findsOneWidget);
+    expect(find.text('Set your direction'), findsNothing);
+    expect(find.text('new@example.com'), findsOneWidget);
+    expect(find.text('New Person'), findsOneWidget);
     expect((await authRepository.loadState()).isSignedIn, isTrue);
     expect(
       (await authRepository.loadLocalAccount())?.normalizedEmail,
@@ -435,6 +444,149 @@ void main() {
     );
   });
 
+  testWidgets('registration onboarding persists account AI health and backup', (
+    tester,
+  ) async {
+    final authRepository = InMemoryAuthRepository();
+    final repository = InMemoryOnboardingRepository();
+    final aiTokenStorage = InMemoryAiTokenStorage();
+    final aiRepository = InMemoryAiSettingsRepository(
+      tokenStorage: aiTokenStorage,
+    );
+    final healthRepository = InMemoryHealthRepository();
+
+    await _pumpApp(
+      tester,
+      authRepository: authRepository,
+      repository: repository,
+      aiSettingsRepository: aiRepository,
+      healthRepository: healthRepository,
+    );
+
+    await tester.tap(find.text('Register'));
+    await tester.pumpAndSettle();
+    await tester.enterText(_textFieldWithLabel('Email'), 'new@example.com');
+    await tester.enterText(_textFieldWithLabel('Name'), 'New Person');
+    await tester.tap(find.widgetWithText(FilledButton, 'Register'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Account details'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const Key('onboarding-account-name-field')),
+      'Profile Person',
+    );
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Set your direction'), findsOneWidget);
+
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Food boundaries'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('Targets and tone'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI provider'), findsOneWidget);
+    await tester.tap(find.byType(DropdownButtonFormField<AiProvider>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Gemini').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('onboarding-ai-token-field')),
+      ' gemini-token ',
+    );
+
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
+    expect(find.text('Consent boundaries'), findsOneWidget);
+    expect(find.text('Start Today'), findsOneWidget);
+    await tester.tap(find.text('Allow backup'));
+    await tester.pumpAndSettle();
+    await _scrollUntilVisible(
+      tester,
+      find.text('Connect Health for nutrition context.'),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'Connect Health for nutrition context.',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollUntilVisible(
+      tester,
+      find.text('I understand nutrition guidance is not medical advice.'),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'I understand nutrition guidance is not medical advice.',
+      ),
+    );
+    await _scrollUntilVisible(
+      tester,
+      find.text('I understand AI meal and macro estimates may be uncertain.'),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'I understand AI meal and macro estimates may be uncertain.',
+      ),
+    );
+    await _scrollUntilVisible(
+      tester,
+      find.text(
+        'Camera, health, and token access stay off until I choose a feature that needs them.',
+      ),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'Camera, health, and token access stay off until I choose a feature that needs them.',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Start Today'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('What should I eat next?'), findsOneWidget);
+    final profile = await repository.loadProfile();
+    expect(profile?.hasRequiredConsent, isTrue);
+    expect(
+      profile?.backupPreference,
+      LocalDataBackupPreference.platformBackupAllowed,
+    );
+    expect(profile?.healthConnectionApproved, isTrue);
+    expect((await authRepository.loadState()).userLabel, 'Profile Person');
+    expect(
+      (await authRepository.loadLocalAccount())?.normalizedEmail,
+      'new@example.com',
+    );
+    expect(
+      (await healthRepository.loadState()).status,
+      HealthConnectionStatus.connected,
+    );
+    expect(await aiTokenStorage.readToken(), 'gemini-token');
+    expect((await aiRepository.loadSettings()).provider, AiProvider.gemini);
+
+    await tester.tap(find.byIcon(Icons.person_outline));
+    await tester.pumpAndSettle();
+    await _scrollUntilVisible(tester, find.text('AI provider'));
+    expect(find.text('Gemini'), findsOneWidget);
+    expect(find.text('Token saved'), findsOneWidget);
+    await _scrollUntilVisible(tester, find.text('Account'));
+    expect(find.text('Profile Person'), findsOneWidget);
+    await _scrollUntilVisible(tester, find.text('Health connection'));
+    expect(find.text('Connected'), findsOneWidget);
+    await _scrollUntilVisible(tester, find.text('Local nutrition data'));
+    expect(find.text('Platform backup allowed'), findsWidgets);
+  });
+
   testWidgets('first-run user can skip optional steps and complete consent', (
     tester,
   ) async {
@@ -447,6 +599,9 @@ void main() {
       healthRepository: healthRepository,
     );
 
+    expect(find.text('Account details'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
+    await tester.pumpAndSettle();
     expect(find.text('Set your direction'), findsOneWidget);
 
     await tester.tap(find.text('Continue'));
@@ -458,6 +613,9 @@ void main() {
     expect(find.text('Targets and tone'), findsOneWidget);
 
     await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI provider'), findsOneWidget);
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
     expect(find.text('Consent boundaries'), findsOneWidget);
     expect(find.text('Start Today'), findsOneWidget);
@@ -545,7 +703,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(await repository.loadProfile(), isNull);
-      expect(find.text('Set your direction'), findsOneWidget);
+      expect(find.text('Account details'), findsOneWidget);
     },
   );
 }

@@ -1,30 +1,64 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
+import '../../domain/models/ai_settings.dart';
+import '../../domain/models/auth.dart';
 import '../../domain/models/nutrition.dart';
 import '../../domain/models/onboarding.dart';
 import '../../shared/widgets/app_action_buttons.dart';
+import '../../shared/widgets/app_chip.dart';
 import '../../shared/widgets/app_section_card.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key, required this.onCompleted});
+  const OnboardingScreen({
+    super.key,
+    required this.onCompleted,
+    this.initialAccount,
+    this.initialAiSettings = AiProviderSettings.defaults,
+    this.aiTokenState = const AiTokenState(
+      hasToken: false,
+      isSecureStorage: true,
+      storageLabel: 'platform secure storage',
+    ),
+    this.onAccountDetailsSaved,
+    this.onAiSettingsSaved,
+  });
 
   final ValueChanged<OnboardingProfile> onCompleted;
+  final LocalAccountRecord? initialAccount;
+  final AiProviderSettings initialAiSettings;
+  final AiTokenState aiTokenState;
+  final Future<void> Function({
+    required String email,
+    required String displayName,
+  })?
+  onAccountDetailsSaved;
+  final Future<void> Function({
+    required AiProviderSettings settings,
+    String? token,
+  })?
+  onAiSettingsSaved;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  static const _lastStep = 5;
+
   final _controller = PageController();
+  late final TextEditingController _emailController;
+  late final TextEditingController _nameController;
   final _allergyController = TextEditingController();
   final _dislikedController = TextEditingController();
   final _proteinController = TextEditingController(text: '110');
   final _targetWeightController = TextEditingController();
+  final _aiTokenController = TextEditingController();
 
   int _step = 0;
   String _primaryGoal = 'Build steady high-protein habits';
   String _coachingTone = 'calm and practical';
+  late AiProviderSettings _aiSettings;
   bool _acceptedNutrition = false;
   bool _acceptedAi = false;
   bool _acceptedPrivacy = false;
@@ -35,14 +69,42 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   bool get _canFinish => _acceptedNutrition && _acceptedAi && _acceptedPrivacy;
 
+  bool get _canContinue {
+    if (_step == 0) {
+      return _looksLikeEmail(_emailController.text) &&
+          _nameController.text.trim().isNotEmpty;
+    }
+    return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final account = widget.initialAccount;
+    _emailController = TextEditingController(text: account?.normalizedEmail);
+    _nameController = TextEditingController(text: account?.displayName);
+    _emailController.addListener(_handleAccountDetailsChanged);
+    _nameController.addListener(_handleAccountDetailsChanged);
+    _aiSettings = widget.initialAiSettings.normalized();
+  }
+
   @override
   void dispose() {
     _controller.dispose();
+    _emailController.removeListener(_handleAccountDetailsChanged);
+    _nameController.removeListener(_handleAccountDetailsChanged);
+    _emailController.dispose();
+    _nameController.dispose();
     _allergyController.dispose();
     _dislikedController.dispose();
     _proteinController.dispose();
     _targetWeightController.dispose();
+    _aiTokenController.dispose();
     super.dispose();
+  }
+
+  void _handleAccountDetailsChanged() {
+    setState(() {});
   }
 
   @override
@@ -62,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   Text(
-                    '${_step + 1} / 4',
+                    '${_step + 1} / ${_lastStep + 1}',
                     style: const TextStyle(
                       color: AppColors.mutedInk,
                       fontWeight: FontWeight.w800,
@@ -77,6 +139,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (step) => setState(() => _step = step),
                 children: [
+                  _AccountDetailsStep(
+                    emailController: _emailController,
+                    nameController: _nameController,
+                  ),
                   _GoalStep(
                     selectedGoal: _primaryGoal,
                     onSelected: (goal) => setState(() => _primaryGoal = goal),
@@ -93,6 +159,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     selectedTone: _coachingTone,
                     onToneSelected: (tone) {
                       setState(() => _coachingTone = tone);
+                    },
+                  ),
+                  _AiProviderStep(
+                    settings: _aiSettings,
+                    tokenState: widget.aiTokenState,
+                    tokenController: _aiTokenController,
+                    onProviderChanged: (provider) {
+                      setState(() {
+                        _aiSettings = _aiSettings.copyWith(provider: provider);
+                      });
                     },
                   ),
                   _ConsentStep(
@@ -133,17 +209,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     const SizedBox(width: AppSpacing.sm),
                   ],
-                  if (_step == 1 || _step == 2) ...[
+                  if (_step == 2 || _step == 3) ...[
                     AppSecondaryButton(label: 'Skip', onPressed: _goNext),
                     const SizedBox(width: AppSpacing.sm),
                   ],
                   Expanded(
                     flex: 2,
                     child: AppPrimaryButton(
-                      label: _step == 3 ? 'Start Today' : 'Continue',
-                      onPressed: _step == 3 && !_canFinish
+                      label: _step == _lastStep ? 'Start Today' : 'Continue',
+                      onPressed:
+                          (!_canContinue || (_step == _lastStep && !_canFinish))
                           ? null
-                          : (_step == 3 ? _complete : _goNext),
+                          : (_step == _lastStep ? _complete : _goNext),
                     ),
                   ),
                 ],
@@ -164,7 +241,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _goBack() {
-    final nextStep = (_step - 1).clamp(0, 3);
+    final nextStep = (_step - 1).clamp(0, _lastStep);
     _controller.animateToPage(
       nextStep,
       duration: const Duration(milliseconds: 220),
@@ -173,7 +250,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _goNext() {
-    final nextStep = (_step + 1).clamp(0, 3);
+    final nextStep = (_step + 1).clamp(0, _lastStep);
     _controller.animateToPage(
       nextStep,
       duration: const Duration(milliseconds: 220),
@@ -181,7 +258,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  void _complete() {
+  Future<void> _complete() async {
+    await widget.onAccountDetailsSaved?.call(
+      email: _emailController.text,
+      displayName: _nameController.text,
+    );
+    await widget.onAiSettingsSaved?.call(
+      settings: _aiSettings,
+      token: _aiTokenController.text,
+    );
     widget.onCompleted(
       OnboardingProfile(
         primaryGoal: _primaryGoal,
@@ -198,6 +283,48 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         backupPreference: _backupPreference,
         healthConnectionApproved: _healthConnectionApproved,
       ),
+    );
+  }
+}
+
+class _AccountDetailsStep extends StatelessWidget {
+  const _AccountDetailsStep({
+    required this.emailController,
+    required this.nameController,
+  });
+
+  final TextEditingController emailController;
+  final TextEditingController nameController;
+
+  @override
+  Widget build(BuildContext context) {
+    return _StepBody(
+      title: 'Account details',
+      children: [
+        const Text('Confirm the local account used for this profile.'),
+        const SizedBox(height: AppSpacing.lg),
+        TextField(
+          key: const Key('onboarding-account-email-field'),
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          decoration: const InputDecoration(
+            labelText: 'Account email',
+            hintText: 'you@example.com',
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          key: const Key('onboarding-account-name-field'),
+          controller: nameController,
+          textCapitalization: TextCapitalization.words,
+          autofillHints: const [AutofillHints.name],
+          decoration: const InputDecoration(
+            labelText: 'Display name',
+            hintText: 'Your name',
+          ),
+        ),
+      ],
     );
   }
 }
@@ -451,6 +578,77 @@ class _ConsentStep extends StatelessWidget {
   }
 }
 
+class _AiProviderStep extends StatelessWidget {
+  const _AiProviderStep({
+    required this.settings,
+    required this.tokenState,
+    required this.tokenController,
+    required this.onProviderChanged,
+  });
+
+  final AiProviderSettings settings;
+  final AiTokenState tokenState;
+  final TextEditingController tokenController;
+  final ValueChanged<AiProvider> onProviderChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final option = settings.option;
+    return _StepBody(
+      title: 'AI provider',
+      children: [
+        DropdownButtonFormField<AiProvider>(
+          initialValue: settings.provider,
+          decoration: const InputDecoration(labelText: 'Provider'),
+          items: [
+            for (final option in AiProviderCatalog.options)
+              DropdownMenuItem(
+                value: option.provider,
+                child: Text(option.label),
+              ),
+          ],
+          onChanged: (provider) {
+            if (provider != null) {
+              onProviderChanged(provider);
+            }
+          },
+        ),
+        const SizedBox(height: AppSpacing.md),
+        AppChip(
+          label: 'Latest model: ${option.latestModel}',
+          icon: Icons.auto_awesome_outlined,
+          tone: AppChipTone.accent,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          '${option.tokenHelpText} Token page: ${option.tokenUrl}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (tokenState.hasToken)
+          const AppChip(
+            label: 'Token saved',
+            icon: Icons.lock_outline,
+            tone: AppChipTone.success,
+          )
+        else
+          TextField(
+            key: const Key('onboarding-ai-token-field'),
+            controller: tokenController,
+            obscureText: true,
+            decoration: const InputDecoration(
+              labelText: 'Provider token',
+              hintText: 'Paste token to save locally',
+              helperText: 'You can skip this and add a token later in Me.',
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _StepBody extends StatelessWidget {
   const _StepBody({required this.title, required this.children});
 
@@ -552,4 +750,9 @@ List<String> _splitList(String value) {
       .map((item) => item.trim())
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
+}
+
+bool _looksLikeEmail(String email) {
+  final trimmed = email.trim();
+  return trimmed.contains('@') && trimmed.contains('.');
 }
