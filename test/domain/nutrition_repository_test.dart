@@ -406,5 +406,60 @@ void main() {
       expect(recreated.meals().single.items, hasLength(1));
       expect(recreated.meals().single.items.single.id, 'valid-item');
     });
+
+    test('clears persisted meals and daily progress for local reset', () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesNutritionRepository(
+        preferences,
+        seedMeals: const [],
+        seedWeightEntries: const [],
+      );
+      final meal = Meal(
+        id: 'reset-meal',
+        name: 'Reset meal',
+        eatenAt: DateTime(2026, 6, 29, 12),
+        items: [
+          MealItem(
+            id: 'reset-item',
+            food: NutritionSeedData.foods.first,
+            servings: 1,
+            source: NutritionSeedData.userSource,
+          ),
+        ],
+        source: NutritionSeedData.userSource,
+      );
+      repository.saveMeal(meal);
+      repository.saveWeightEntry(
+        WeightEntry(
+          id: 'reset-weight',
+          recordedAt: DateTime(2026, 6, 29, 7),
+          weightKg: 82,
+          source: NutritionSeedData.userSource,
+        ),
+      );
+      await repository.flushPendingWrites();
+
+      await repository.clearLocalProgress();
+
+      expect(repository.meals(), isEmpty);
+      expect(repository.weightEntries(), isEmpty);
+      expect(
+        preferences.containsKey(SharedPreferencesNutritionRepository.stateKey),
+        isFalse,
+      );
+
+      final recreated = SharedPreferencesNutritionRepository(
+        preferences,
+        seedMeals: const [],
+        seedWeightEntries: const [],
+      );
+      final summary = recreated.dailySummary(DateTime(2026, 6, 29));
+
+      expect(recreated.meals(), isEmpty);
+      expect(recreated.weightEntries(), isEmpty);
+      expect(summary.meals, isEmpty);
+      expect(summary.knownMacroTotals.calories, 0);
+    });
   });
 }

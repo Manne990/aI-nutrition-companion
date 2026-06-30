@@ -40,6 +40,24 @@ abstract interface class NutritionRepository {
   });
 
   WeightEntry saveWeightEntry(WeightEntry entry);
+
+  Future<void> clearLocalProgress();
+
+  NutritionStorageStatus storageStatus();
+}
+
+class NutritionStorageStatus {
+  const NutritionStorageStatus({
+    required this.isPersistent,
+    required this.storageLabel,
+    this.errorMessage,
+  });
+
+  final bool isPersistent;
+  final String storageLabel;
+  final String? errorMessage;
+
+  bool get hasError => errorMessage != null;
 }
 
 class InMemoryNutritionRepository implements NutritionRepository {
@@ -154,6 +172,20 @@ class InMemoryNutritionRepository implements NutritionRepository {
     _weightEntries.sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
     return entry;
   }
+
+  @override
+  Future<void> clearLocalProgress() async {
+    _meals.clear();
+    _weightEntries.clear();
+  }
+
+  @override
+  NutritionStorageStatus storageStatus() {
+    return const NutritionStorageStatus(
+      isPersistent: false,
+      storageLabel: 'In-memory local state',
+    );
+  }
 }
 
 class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
@@ -194,6 +226,7 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
 
   final SharedPreferences _sharedPreferences;
   Future<void>? _pendingPersist;
+  String? _lastPersistenceError;
 
   static Future<SharedPreferencesNutritionRepository> create({
     List<FoodItem>? seedFoods,
@@ -233,10 +266,37 @@ class SharedPreferencesNutritionRepository extends InMemoryNutritionRepository {
     await _pendingPersist;
   }
 
-  void _schedulePersist() {
-    _pendingPersist = (_pendingPersist ?? Future<void>.value()).then(
-      (_) => _persistState(),
+  @override
+  Future<void> clearLocalProgress() async {
+    await flushPendingWrites();
+    await super.clearLocalProgress();
+    final removed = await _sharedPreferences.remove(stateKey);
+    _lastPersistenceError = removed
+        ? null
+        : 'Nutrition history could not be cleared locally.';
+  }
+
+  @override
+  NutritionStorageStatus storageStatus() {
+    return NutritionStorageStatus(
+      isPersistent: true,
+      storageLabel: 'Shared preferences on this device',
+      errorMessage: _lastPersistenceError,
     );
+  }
+
+  void _schedulePersist() {
+    _pendingPersist = (_pendingPersist ?? Future<void>.value())
+        .then((_) => _persistState())
+        .then<void>(
+          (_) {
+            _lastPersistenceError = null;
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            _lastPersistenceError =
+                'Nutrition progress could not be saved locally.';
+          },
+        );
     unawaited(_pendingPersist);
   }
 

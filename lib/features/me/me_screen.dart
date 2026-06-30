@@ -10,6 +10,7 @@ import '../../domain/models/onboarding.dart';
 import '../../domain/repositories/ai_settings_repository.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/health_repository.dart';
+import '../../domain/repositories/nutrition_repository.dart';
 import '../../shared/widgets/app_action_buttons.dart';
 import '../../shared/widgets/app_chip.dart';
 import '../../shared/widgets/app_section_card.dart';
@@ -18,6 +19,7 @@ class MeScreen extends StatefulWidget {
   const MeScreen({
     super.key,
     required this.profile,
+    required this.nutritionRepository,
     required this.aiSettingsRepository,
     required this.authRepository,
     required this.authState,
@@ -27,11 +29,13 @@ class MeScreen extends StatefulWidget {
     required this.onAuthStateChanged,
     required this.onHealthStateChanged,
     required this.onResetOnboarding,
+    required this.onResetNutritionProgress,
     this.diagnosticsConfig = const AppDiagnosticsConfig(),
     this.diagnosticsClipboard = const SystemDiagnosticsClipboard(),
   });
 
   final OnboardingProfile profile;
+  final NutritionRepository nutritionRepository;
   final AiSettingsRepository aiSettingsRepository;
   final AuthRepository authRepository;
   final AuthAccountState authState;
@@ -41,6 +45,7 @@ class MeScreen extends StatefulWidget {
   final Future<void> Function() onAuthStateChanged;
   final Future<void> Function() onHealthStateChanged;
   final Future<void> Function() onResetOnboarding;
+  final Future<void> Function() onResetNutritionProgress;
   final AppDiagnosticsConfig diagnosticsConfig;
   final DiagnosticsClipboard diagnosticsClipboard;
 
@@ -60,6 +65,7 @@ class _MeScreenState extends State<MeScreen> {
   String? _credentialStatusMessage;
   String? _healthStatusMessage;
   String? _diagnosticsStatusMessage;
+  String? _nutritionStatusMessage;
 
   @override
   void initState() {
@@ -160,6 +166,8 @@ class _MeScreenState extends State<MeScreen> {
         _buildAccountCard(context),
         const SizedBox(height: 16),
         _buildHealthConnectionCard(context),
+        const SizedBox(height: 16),
+        _buildLocalNutritionDataCard(context),
         const SizedBox(height: 16),
         AppSectionCard(
           title: 'Privacy and safety disclosures',
@@ -631,6 +639,77 @@ class _MeScreenState extends State<MeScreen> {
     );
   }
 
+  Widget _buildLocalNutritionDataCard(BuildContext context) {
+    final repository = widget.nutritionRepository;
+    final storageStatus = repository.storageStatus();
+    final mealCount = repository.meals().length;
+    final weightCount = repository.weightEntries().length;
+
+    return AppSectionCard(
+      title: 'Local nutrition data',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Confirmed meals and daily progress are stored on this device and can be cleared without changing onboarding or credentials.',
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppChip(
+                label: storageStatus.isPersistent
+                    ? 'Persists after restart'
+                    : 'Session only',
+                icon: storageStatus.isPersistent
+                    ? Icons.save_outlined
+                    : Icons.memory_outlined,
+                tone: storageStatus.isPersistent
+                    ? AppChipTone.success
+                    : AppChipTone.neutral,
+              ),
+              AppChip(
+                label: storageStatus.storageLabel,
+                icon: Icons.storage_outlined,
+              ),
+              AppChip(
+                label: _mealCountLabel(mealCount),
+                icon: Icons.restaurant_outlined,
+              ),
+              AppChip(
+                label: _weightCountLabel(weightCount),
+                icon: Icons.monitor_weight_outlined,
+              ),
+            ],
+          ),
+          if (storageStatus.hasError) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppChip(
+              label: storageStatus.errorMessage!,
+              icon: Icons.error_outline,
+              tone: AppChipTone.accent,
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          AppSecondaryButton(
+            label: 'Reset nutrition history',
+            icon: Icons.delete_outline,
+            onPressed: _resetNutritionProgress,
+          ),
+          if (_nutritionStatusMessage != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            AppChip(
+              label: _nutritionStatusMessage!,
+              icon: Icons.check_circle_outline,
+              tone: AppChipTone.success,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveAiSettings() async {
     final settings = _draftSettings ?? AiProviderSettings.defaults;
     await widget.aiSettingsRepository.saveSettings(settings);
@@ -759,6 +838,13 @@ class _MeScreenState extends State<MeScreen> {
     });
   }
 
+  Future<void> _resetNutritionProgress() async {
+    await widget.onResetNutritionProgress();
+    setState(() {
+      _nutritionStatusMessage = 'Nutrition history reset on this device.';
+    });
+  }
+
   String _providerStatus(AiProviderSettings settings, AiTokenState tokenState) {
     if (settings.usesMockProvider) {
       return 'Mock AI is the default for tests and local CI. No token is required.';
@@ -768,6 +854,14 @@ class _MeScreenState extends State<MeScreen> {
     }
     return '${settings.option.label} is selected with ${settings.model}. Add a token before real provider mode can be used.';
   }
+}
+
+String _mealCountLabel(int count) {
+  return count == 1 ? '1 meal' : '$count meals';
+}
+
+String _weightCountLabel(int count) {
+  return count == 1 ? '1 weight entry' : '$count weight entries';
 }
 
 List<String> _signalLabels(HealthSignalSnapshot? signals) {

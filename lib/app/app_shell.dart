@@ -158,6 +158,7 @@ class _AppShellState extends State<AppShell> {
                   KitchenScreen(repository: nutritionRepository),
                   MeScreen(
                     profile: profile,
+                    nutritionRepository: nutritionRepository,
                     aiSettingsRepository: widget.aiSettingsRepository,
                     authRepository: widget.authRepository,
                     authState: authState,
@@ -167,6 +168,8 @@ class _AppShellState extends State<AppShell> {
                     onAuthStateChanged: _reloadAuthState,
                     onHealthStateChanged: _reloadHealthState,
                     onResetOnboarding: _resetOnboarding,
+                    onResetNutritionProgress: () =>
+                        _resetNutritionProgress(nutritionRepository),
                   ),
                 ];
 
@@ -211,6 +214,13 @@ class _AppShellState extends State<AppShell> {
       _selectedIndex = 0;
       _profileFuture = Future<OnboardingProfile?>.value();
     });
+  }
+
+  Future<void> _resetNutritionProgress(
+    NutritionRepository nutritionRepository,
+  ) async {
+    await nutritionRepository.clearLocalProgress();
+    setState(() {});
   }
 
   Future<void> _reloadAiConfiguration() async {

@@ -7,6 +7,7 @@ import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/auth_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/health_repository.dart';
+import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
 import 'package:ai_nutrition_companion/features/me/me_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +39,7 @@ Future<void> _pumpMe(
   AuthAccountState authState = AuthAccountState.signedOut,
   InMemoryHealthRepository? healthRepository,
   HealthConnectionState healthState = HealthConnectionState.disconnected,
+  InMemoryNutritionRepository? nutritionRepository,
   AppDiagnosticsConfig diagnosticsConfig = const AppDiagnosticsConfig(),
   DiagnosticsClipboard diagnosticsClipboard =
       const SystemDiagnosticsClipboard(),
@@ -46,10 +48,13 @@ Future<void> _pumpMe(
       authRepository ?? InMemoryAuthRepository(initialState: authState);
   final effectiveHealthRepository =
       healthRepository ?? InMemoryHealthRepository(initialState: healthState);
+  final effectiveNutritionRepository =
+      nutritionRepository ?? InMemoryNutritionRepository();
   await tester.pumpWidget(
     _wrap(
       MeScreen(
         profile: _profile(),
+        nutritionRepository: effectiveNutritionRepository,
         aiSettingsRepository: aiRepository,
         authRepository: effectiveAuthRepository,
         authState: authState,
@@ -59,6 +64,8 @@ Future<void> _pumpMe(
         onAuthStateChanged: () async {},
         onHealthStateChanged: () async {},
         onResetOnboarding: () async {},
+        onResetNutritionProgress:
+            effectiveNutritionRepository.clearLocalProgress,
         diagnosticsConfig: diagnosticsConfig,
         diagnosticsClipboard: diagnosticsClipboard,
       ),
@@ -74,7 +81,7 @@ Future<void> _openProviderMenu(WidgetTester tester) async {
 
 Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
   final scrollable = find.byType(ListView);
-  for (var attempt = 0; attempt < 8; attempt += 1) {
+  for (var attempt = 0; attempt < 14; attempt += 1) {
     await tester.pump();
     if (finder.evaluate().isNotEmpty) {
       await tester.ensureVisible(finder);
@@ -298,6 +305,34 @@ void main() {
       find.text('FoodData Central key deleted from this device.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('user can reset local nutrition history', (tester) async {
+    final aiRepository = InMemoryAiSettingsRepository();
+    final nutritionRepository = InMemoryNutritionRepository();
+
+    await _pumpMe(
+      tester,
+      aiRepository,
+      nutritionRepository: nutritionRepository,
+    );
+
+    await _scrollUntilVisible(tester, find.text('Local nutrition data'));
+    expect(find.text('2 meals'), findsOneWidget);
+    expect(find.text('1 weight entry'), findsOneWidget);
+
+    await _scrollUntilVisible(tester, find.text('Reset nutrition history'));
+    await tester.tap(find.text('Reset nutrition history'));
+    await tester.pumpAndSettle();
+
+    expect(nutritionRepository.meals(), isEmpty);
+    expect(nutritionRepository.weightEntries(), isEmpty);
+    expect(
+      find.text('Nutrition history reset on this device.'),
+      findsOneWidget,
+    );
+    expect(find.text('0 meals'), findsOneWidget);
+    expect(find.text('0 weight entries'), findsOneWidget);
   });
 
   testWidgets('user can copy redacted diagnostics from Me', (tester) async {
