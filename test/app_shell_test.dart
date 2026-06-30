@@ -1,4 +1,5 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
+import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_chat_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
@@ -8,6 +9,7 @@ import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.
 import 'package:ai_nutrition_companion/domain/repositories/onboarding_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 OnboardingProfile _profile() {
   return OnboardingProfile(
@@ -26,6 +28,7 @@ Future<void> _pumpApp(
   WidgetTester tester, {
   InMemoryOnboardingRepository? repository,
   NutritionRepository? nutritionRepository,
+  bool useDefaultNutritionRepository = false,
 }) async {
   await tester.pumpWidget(
     AiNutritionCompanionApp(
@@ -35,7 +38,9 @@ Future<void> _pumpApp(
       authRepository: InMemoryAuthRepository(),
       healthRepository: InMemoryHealthRepository(),
       aiChatRepository: InMemoryAiChatRepository(),
-      nutritionRepository: nutritionRepository ?? InMemoryNutritionRepository(),
+      nutritionRepository: useDefaultNutritionRepository
+          ? nutritionRepository
+          : nutritionRepository ?? InMemoryNutritionRepository(),
     ),
   );
   await tester.pumpAndSettle();
@@ -115,6 +120,49 @@ void main() {
 
     expect(find.text('Favorite meals'), findsOneWidget);
     expect(find.text('Banana snack'), findsOneWidget);
+  });
+
+  testWidgets('Today and Kitchen restore persisted nutrition progress', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repository = SharedPreferencesNutritionRepository(
+      preferences,
+      seedMeals: const [],
+      seedWeightEntries: const [],
+    );
+    repository.saveMeal(
+      Meal(
+        id: 'persisted-banana',
+        name: 'Persisted banana snack',
+        eatenAt: DateTime(2026, 6, 29, 15),
+        items: [
+          MealItem(
+            id: 'persisted-banana-item',
+            food: NutritionSeedData.foods.firstWhere(
+              (food) => food.id == 'food-banana',
+            ),
+            servings: 1,
+            source: NutritionSeedData.userSource,
+          ),
+        ],
+        source: NutritionSeedData.userSource,
+      ),
+    );
+    await repository.flushPendingWrites();
+
+    await _pumpApp(tester, useDefaultNutritionRepository: true);
+
+    await _scrollUntilVisible(tester, find.text('Persisted banana snack'));
+    expect(find.text('Persisted banana snack'), findsOneWidget);
+    expect(find.text('105 kcal | 1g protein'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.restaurant_menu_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Favorite meals'), findsOneWidget);
+    expect(find.text('Persisted banana snack'), findsOneWidget);
   });
 
   testWidgets('first-run user can skip optional steps and complete consent', (
