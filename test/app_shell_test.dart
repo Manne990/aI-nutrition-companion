@@ -1,4 +1,5 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
+import 'package:ai_nutrition_companion/app/service_credentials.dart';
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_chat_repository.dart';
@@ -74,6 +75,7 @@ Future<void> _pumpApp(
   AiSettingsRepository? aiSettingsRepository,
   NutritionRepository? nutritionRepository,
   FoodDataCentralSearchClient? foodDataCentralSearchClient,
+  AppServiceCredentials serviceCredentials = const AppServiceCredentials(),
   bool useDefaultNutritionRepository = false,
   DateTime? now,
 }) async {
@@ -89,6 +91,7 @@ Future<void> _pumpApp(
       nutritionRepository: useDefaultNutritionRepository
           ? nutritionRepository
           : nutritionRepository ?? InMemoryNutritionRepository(),
+      serviceCredentials: serviceCredentials,
       foodDataCentralSearchClient: foodDataCentralSearchClient,
       now: now ?? DateTime(2026, 6, 29, 15, 30),
     ),
@@ -221,98 +224,57 @@ void main() {
     expect(find.text('Persisted banana snack'), findsOneWidget);
   });
 
-  testWidgets(
-    'FoodData Central key save change and delete refresh runtime lookup',
-    (tester) async {
-      SharedPreferences.setMockInitialValues({});
-      final aiSettingsRepository = InMemoryAiSettingsRepository();
-      final foodDataCentralClient = _RuntimeFoodDataCentralSearchClient();
+  testWidgets('configured FoodData Central key enables runtime lookup', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final foodDataCentralClient = _RuntimeFoodDataCentralSearchClient();
 
-      await _pumpApp(
-        tester,
-        aiSettingsRepository: aiSettingsRepository,
-        useDefaultNutritionRepository: true,
-        foodDataCentralSearchClient: foodDataCentralClient,
-      );
+    await _pumpApp(
+      tester,
+      useDefaultNutritionRepository: true,
+      serviceCredentials: const AppServiceCredentials(
+        foodDataCentralApiKey: 'configured-build-key',
+      ),
+      foodDataCentralSearchClient: foodDataCentralClient,
+    );
 
-      await tester.tap(find.byIcon(Icons.person_outline));
-      await tester.pumpAndSettle();
-      await _scrollUntilVisible(
-        tester,
-        _textFieldWithLabel('FoodData Central API key'),
-      );
-      await tester.enterText(
-        _textFieldWithLabel('FoodData Central API key'),
-        'first-user-key',
-      );
-      await _scrollUntilVisible(tester, find.text('Save FoodData Central key'));
-      await tester.tap(find.text('Save FoodData Central key'));
-      await tester.pumpAndSettle();
+    await _searchGenericFood(tester, 'salmon');
 
-      await tester.tap(find.byIcon(Icons.wb_sunny_outlined));
-      await tester.pumpAndSettle();
-      await _searchGenericFood(tester, 'salmon');
+    expect(foodDataCentralClient.apiKeys, ['configured-build-key']);
+    expect(find.text('salmon verified'), findsOneWidget);
+    expect(
+      find.text('Matched FoodData Central search nutrition.'),
+      findsOneWidget,
+    );
+  });
 
-      expect(foodDataCentralClient.apiKeys, ['first-user-key']);
-      expect(find.text('salmon verified'), findsOneWidget);
-      expect(
-        find.text('Matched FoodData Central search nutrition.'),
-        findsOneWidget,
-      );
+  testWidgets('missing FoodData Central app key degrades gracefully', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final foodDataCentralClient = _RuntimeFoodDataCentralSearchClient();
 
-      await tester.tap(find.byIcon(Icons.person_outline));
-      await tester.pumpAndSettle();
-      await _scrollUntilVisible(
-        tester,
-        _textFieldWithLabel('FoodData Central API key'),
-      );
-      await tester.enterText(
-        _textFieldWithLabel('FoodData Central API key'),
-        'second-user-key',
-      );
-      await _scrollUntilVisible(
-        tester,
-        find.text('Update FoodData Central key'),
-      );
-      await tester.tap(find.text('Update FoodData Central key'));
-      await tester.pumpAndSettle();
+    await _pumpApp(
+      tester,
+      useDefaultNutritionRepository: true,
+      serviceCredentials: const AppServiceCredentials(
+        foodDataCentralApiKey: '',
+      ),
+      foodDataCentralSearchClient: foodDataCentralClient,
+    );
 
-      await tester.tap(find.byIcon(Icons.wb_sunny_outlined));
-      await tester.pumpAndSettle();
-      await _searchGenericFood(tester, 'oats');
+    await _searchGenericFood(tester, 'avocado');
 
-      expect(foodDataCentralClient.apiKeys, [
-        'first-user-key',
-        'second-user-key',
-      ]);
-      expect(find.text('oats verified'), findsOneWidget);
-
-      await tester.tap(find.byIcon(Icons.person_outline));
-      await tester.pumpAndSettle();
-      await _scrollUntilVisible(
-        tester,
-        find.text('Delete FoodData Central key'),
-      );
-      await tester.tap(find.text('Delete FoodData Central key'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byIcon(Icons.wb_sunny_outlined));
-      await tester.pumpAndSettle();
-      await _searchGenericFood(tester, 'avocado');
-
-      expect(foodDataCentralClient.apiKeys, [
-        'first-user-key',
-        'second-user-key',
-      ]);
-      expect(find.text('FoodData Central key needed'), findsOneWidget);
-      expect(
-        find.text(
-          'Add a FoodData Central API key to use generic food search. No app-owned key is bundled.',
-        ),
-        findsOneWidget,
-      );
-    },
-  );
+    expect(foodDataCentralClient.apiKeys, isEmpty);
+    expect(find.text('FoodData Central unavailable'), findsOneWidget);
+    expect(
+      find.text(
+        'FoodData Central lookup is not configured for this build. Open Food Facts and local fallback nutrition remain available.',
+      ),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('first-run user can skip optional steps and complete consent', (
     tester,

@@ -171,7 +171,7 @@ void main() {
     });
 
     test(
-      'FoodData Central adapter reports missing API key explicitly',
+      'FoodData Central adapter reports missing app configuration explicitly',
       () async {
         const provider = FoodDataCentralNutritionProvider(apiKey: null);
 
@@ -181,8 +181,8 @@ void main() {
 
         expect(result.status, NutritionLookupStatus.missingApiKey);
         expect(result.isProviderUnavailable, isTrue);
-        expect(result.message, contains('FoodData Central API key'));
-        expect(result.message, contains('No app-owned key'));
+        expect(result.message, contains('not configured for this build'));
+        expect(result.message, contains('Open Food Facts'));
       },
     );
 
@@ -214,7 +214,7 @@ void main() {
         }),
       );
       final provider = FoodDataCentralNutritionProvider(
-        apiKey: 'user-owned-test-key',
+        apiKey: 'configured-test-key',
         client: client,
       );
 
@@ -222,7 +222,7 @@ void main() {
         const NutritionLookupQuery(foodName: 'salmon'),
       );
 
-      expect(client.lastApiKey, 'user-owned-test-key');
+      expect(client.lastApiKey, 'configured-test-key');
       expect(client.lastQuery, 'salmon');
       expect(result.status, NutritionLookupStatus.verified);
       expect(result.providerName, 'fooddata-central');
@@ -266,7 +266,7 @@ void main() {
 
         final response = await client.searchFoods(
           query: 'salmon',
-          apiKey: 'user-owned-test-key',
+          apiKey: 'configured-test-key',
         );
 
         expect(transport.lastUri?.scheme, 'https');
@@ -275,7 +275,7 @@ void main() {
         expect(transport.lastUri?.queryParameters['query'], 'salmon');
         expect(
           transport.lastUri?.queryParameters['api_key'],
-          'user-owned-test-key',
+          'configured-test-key',
         );
         expect(transport.lastUri?.queryParameters['pageSize'], '5');
         expect(transport.lastHeaders['accept'], 'application/json');
@@ -329,7 +329,7 @@ void main() {
         ) {
           return client.searchFoods(
             query: 'salmon',
-            apiKey: 'user-owned-test-key',
+            apiKey: 'configured-test-key',
           );
         }
 
@@ -354,7 +354,7 @@ void main() {
 
     test('FoodData Central adapter reports no search results', () async {
       final provider = FoodDataCentralNutritionProvider(
-        apiKey: 'user-owned-test-key',
+        apiKey: 'configured-test-key',
         client: _FakeFoodDataCentralSearchClient(
           response: const FoodDataCentralSearchResponse(foods: []),
         ),
@@ -371,7 +371,7 @@ void main() {
 
     test('FoodData Central adapter reports provider errors', () async {
       final provider = FoodDataCentralNutritionProvider(
-        apiKey: 'user-owned-test-key',
+        apiKey: 'configured-test-key',
         client: _FakeFoodDataCentralSearchClient(
           failure: StateError('simulated transport failure'),
         ),
@@ -384,20 +384,20 @@ void main() {
       expect(result.status, NutritionLookupStatus.providerUnavailable);
       expect(result.providerName, 'fooddata-central');
       expect(result.message, contains('FoodData Central lookup failed'));
-      expect(result.message, isNot(contains('user-owned-test-key')));
+      expect(result.message, isNot(contains('configured-test-key')));
     });
 
     test(
       'FoodData Central adapter distinguishes timeout and rate limit',
       () async {
         final timeoutProvider = FoodDataCentralNutritionProvider(
-          apiKey: 'user-owned-test-key',
+          apiKey: 'configured-test-key',
           client: _FakeFoodDataCentralSearchClient(
             failure: TimeoutException('simulated timeout'),
           ),
         );
         final rateLimitProvider = FoodDataCentralNutritionProvider(
-          apiKey: 'user-owned-test-key',
+          apiKey: 'configured-test-key',
           client: _FakeFoodDataCentralSearchClient(
             failure: const FoodDataCentralRateLimitException(),
           ),
@@ -712,7 +712,7 @@ void main() {
         );
         expect(
           enrichment.lookupResults.single.message,
-          contains('FoodData Central API key'),
+          contains('FoodData Central lookup is not configured'),
         );
         expect(enriched.source.source, NutritionSource.aiEstimated);
         expect(enriched.food.source.source, NutritionSource.fallback);

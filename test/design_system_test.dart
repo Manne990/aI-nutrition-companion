@@ -85,12 +85,12 @@ void main() {
             child: AppActionButtonGroup(
               children: [
                 AppSecondaryButton(
-                  label: 'Save FoodData Central key',
+                  label: 'Save provider token',
                   icon: Icons.key,
                   onPressed: () {},
                 ),
                 AppSecondaryButton(
-                  label: 'Delete FoodData Central key',
+                  label: 'Delete provider token',
                   icon: Icons.delete_outline,
                   onPressed: () {},
                 ),
@@ -103,10 +103,10 @@ void main() {
 
     expect(tester.takeException(), isNull);
     final saveTop = tester.getTopLeft(
-      find.widgetWithText(OutlinedButton, 'Save FoodData Central key'),
+      find.widgetWithText(OutlinedButton, 'Save provider token'),
     );
     final deleteTop = tester.getTopLeft(
-      find.widgetWithText(OutlinedButton, 'Delete FoodData Central key'),
+      find.widgetWithText(OutlinedButton, 'Delete provider token'),
     );
     expect(deleteTop.dy, greaterThan(saveTop.dy));
     expect(deleteTop.dx, saveTop.dx);

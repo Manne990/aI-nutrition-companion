@@ -138,22 +138,6 @@ class AiTokenState {
   bool get isAvailable => errorMessage == null;
 }
 
-class FoodDataCentralKeyState {
-  const FoodDataCentralKeyState({
-    required this.hasKey,
-    required this.isSecureStorage,
-    required this.storageLabel,
-    this.errorMessage,
-  });
-
-  final bool hasKey;
-  final bool isSecureStorage;
-  final String storageLabel;
-  final String? errorMessage;
-
-  bool get isAvailable => errorMessage == null;
-}
-
 class AiAdapterConfiguration {
   const AiAdapterConfiguration({
     required this.settings,

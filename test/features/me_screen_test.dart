@@ -105,7 +105,6 @@ void main() {
     expect(find.text('Mock AI'), findsOneWidget);
     expect(find.text('mock-companion-v1'), findsOneWidget);
     expect(find.text('No token saved'), findsOneWidget);
-    expect(find.text('No FoodData Central key'), findsOneWidget);
     expect(find.text('Secure local storage'), findsWidgets);
     expect(
       find.textContaining('Mock AI is the default for tests and local CI'),
@@ -266,45 +265,20 @@ void main() {
     expect(find.text('Token deleted from this device.'), findsOneWidget);
   });
 
-  testWidgets('user can save, update, and delete FoodData Central key state', (
+  testWidgets('Me does not expose FoodData Central credential controls', (
     tester,
   ) async {
     final repository = InMemoryAiSettingsRepository();
 
     await _pumpMe(tester, repository);
-    await _scrollUntilVisible(tester, find.text('Save FoodData Central key'));
-    await tester.enterText(
-      find.byKey(const Key('fooddata-central-api-key-field')),
-      ' entered nutrition value ',
-    );
-    await tester.tap(find.text('Save FoodData Central key'));
-    await tester.pumpAndSettle();
+    await _scrollUntilVisible(tester, find.text('Feedback and diagnostics'));
 
-    expect((await repository.loadFoodDataCentralKeyState()).hasKey, isTrue);
-    expect(find.text('FoodData Central key saved'), findsOneWidget);
-    expect(find.text('entered nutrition value'), findsNothing);
-    expect(find.text('FoodData Central key saved locally.'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const Key('fooddata-central-api-key-field')),
-      'updated nutrition value',
-    );
-    await _scrollUntilVisible(tester, find.text('Update FoodData Central key'));
-    await tester.tap(find.text('Update FoodData Central key'));
-    await tester.pumpAndSettle();
-
-    expect((await repository.loadFoodDataCentralKeyState()).hasKey, isTrue);
-    expect(find.text('updated nutrition value'), findsNothing);
-
-    await _scrollUntilVisible(tester, find.text('Delete FoodData Central key'));
-    await tester.tap(find.text('Delete FoodData Central key'));
-    await tester.pumpAndSettle();
-
-    expect((await repository.loadFoodDataCentralKeyState()).hasKey, isFalse);
-    expect(find.text('No FoodData Central key'), findsOneWidget);
+    expect(find.text('External service credentials'), findsNothing);
+    expect(find.textContaining('FoodData Central API key'), findsNothing);
+    expect(find.textContaining('FoodData Central key'), findsNothing);
     expect(
-      find.text('FoodData Central key deleted from this device.'),
-      findsOneWidget,
+      find.byKey(const Key('fooddata-central-api-key-field')),
+      findsNothing,
     );
   });
 
@@ -354,19 +328,14 @@ void main() {
 
   testWidgets('user can copy redacted diagnostics from Me', (tester) async {
     final aiTokenStorage = InMemoryAiTokenStorage();
-    final foodDataCentralKeyStorage = InMemoryAiTokenStorage(
-      storageLabel: 'test FoodData Central key storage',
-    );
     final repository = InMemoryAiSettingsRepository(
       settings: const AiProviderSettings(
         provider: AiProvider.openai,
         model: 'gpt-4.1-mini',
       ),
       tokenStorage: aiTokenStorage,
-      foodDataCentralKeyStorage: foodDataCentralKeyStorage,
     );
     await repository.saveToken('sk-test-secret');
-    await repository.saveFoodDataCentralKey('fdc-test-secret');
     final clipboard = _FakeDiagnosticsClipboard();
 
     await _pumpMe(
@@ -391,13 +360,9 @@ void main() {
     expect(clipboard.text, contains('- Provider: OpenAI'));
     expect(clipboard.text, contains('- Model: gpt-4.1-mini'));
     expect(clipboard.text, contains('- AI token: saved (redacted)'));
-    expect(
-      clipboard.text,
-      contains('- FoodData Central key: saved (redacted)'),
-    );
     expect(clipboard.text, contains('- Onboarding complete: yes'));
     expect(clipboard.text, isNot(contains('sk-test-secret')));
-    expect(clipboard.text, isNot(contains('fdc-test-secret')));
+    expect(clipboard.text, isNot(contains('FoodData Central key')));
   });
 
   testWidgets('health connection starts disconnected until user intent', (

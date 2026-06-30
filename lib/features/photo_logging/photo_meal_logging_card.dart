@@ -600,7 +600,7 @@ class _GenericFoodSearch extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Search FoodData Central using a user-provided key from Me. No app-owned key is bundled.',
+              'Search FoodData Central when the app is configured for it. Open Food Facts stays available without user credentials.',
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
@@ -1074,7 +1074,7 @@ String _statusCopy(NutritionLookupStatus status, _LookupKind kind) {
     NutritionLookupStatus.missingApiKey =>
       kind == _LookupKind.packaged
           ? 'Provider setup needed'
-          : 'FoodData Central key needed',
+          : 'FoodData Central unavailable',
     NutritionLookupStatus.timeout => 'Provider timeout',
     NutritionLookupStatus.rateLimited => 'Provider rate limit',
     NutritionLookupStatus.malformedResponse => 'Provider data malformed',

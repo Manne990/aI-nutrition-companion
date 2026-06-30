@@ -18,6 +18,7 @@ import '../services/adapters/ai_chat_adapter.dart';
 import '../services/adapters/meal_recognition_adapter.dart';
 import '../services/adapters/nutrition_companion_adapter.dart';
 import '../services/adapters/nutrition_lookup_adapters.dart';
+import 'service_credentials.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -28,6 +29,7 @@ class AppShell extends StatefulWidget {
     required this.healthRepository,
     required this.aiChatRepository,
     this.nutritionRepository,
+    this.serviceCredentials = const AppServiceCredentials(),
     this.foodDataCentralSearchClient,
     this.now,
   });
@@ -38,6 +40,7 @@ class AppShell extends StatefulWidget {
   final HealthRepository healthRepository;
   final AiChatRepository aiChatRepository;
   final NutritionRepository? nutritionRepository;
+  final AppServiceCredentials serviceCredentials;
   final FoodDataCentralSearchClient? foodDataCentralSearchClient;
   final DateTime? now;
 
@@ -291,8 +294,8 @@ class _AppShellState extends State<AppShell> {
       seedGoal: profile.toNutritionGoal(calories: 2200),
       seedPreferences: profile.toUserPreferences(),
       seedBackupPreference: profile.backupPreference,
-      foodDataCentralApiKey: await widget.aiSettingsRepository
-          .readFoodDataCentralKey(),
+      foodDataCentralApiKey:
+          widget.serviceCredentials.configuredFoodDataCentralApiKey,
       foodDataCentralSearchClient: widget.foodDataCentralSearchClient,
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_shell.dart';
+import 'service_credentials.dart';
 import 'theme/app_theme.dart';
 import '../domain/repositories/ai_chat_repository.dart';
 import '../domain/repositories/ai_settings_repository.dart';
@@ -20,6 +21,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
     this.aiChatRepository,
     this.nutritionRepository,
     this.foodDataCentralSearchClient,
+    this.serviceCredentials = const AppServiceCredentials(),
     this.now,
   });
 
@@ -30,6 +32,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
   final AiChatRepository? aiChatRepository;
   final NutritionRepository? nutritionRepository;
   final FoodDataCentralSearchClient? foodDataCentralSearchClient;
+  final AppServiceCredentials serviceCredentials;
   final DateTime? now;
 
   @override
@@ -91,6 +94,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
               healthRepository: repositories.healthRepository,
               aiChatRepository: repositories.aiChatRepository,
               nutritionRepository: repositories.nutritionRepository,
+              serviceCredentials: widget.serviceCredentials,
               foodDataCentralSearchClient: widget.foodDataCentralSearchClient,
               now: widget.now,
             );

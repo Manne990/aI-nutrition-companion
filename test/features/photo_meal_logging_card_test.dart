@@ -411,7 +411,7 @@ void main() {
               status: NutritionLookupStatus.missingApiKey,
               providerName: 'fooddata-central',
               message:
-                  'Add a FoodData Central API key to use generic food search. No app-owned key is bundled.',
+                  'FoodData Central lookup is not configured for this build. Open Food Facts and local fallback nutrition remain available.',
             ),
             (query) => NutritionLookupResult(
               query: query,
@@ -458,7 +458,7 @@ void main() {
       expect(find.text('Generic food search'), findsOneWidget);
       expect(
         find.text(
-          'Search FoodData Central using a user-provided key from Me. No app-owned key is bundled.',
+          'Search FoodData Central when the app is configured for it. Open Food Facts stays available without user credentials.',
         ),
         findsOneWidget,
       );
@@ -470,10 +470,10 @@ void main() {
 
       expect(capturedQueries.single.foodName, 'salmon');
       expect(capturedQueries.single.barcode, isNull);
-      expect(find.text('FoodData Central key needed'), findsOneWidget);
+      expect(find.text('FoodData Central unavailable'), findsOneWidget);
       expect(
         find.text(
-          'Add a FoodData Central API key to use generic food search. No app-owned key is bundled.',
+          'FoodData Central lookup is not configured for this build. Open Food Facts and local fallback nutrition remain available.',
         ),
         findsOneWidget,
       );

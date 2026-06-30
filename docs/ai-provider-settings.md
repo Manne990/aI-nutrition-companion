@@ -1,4 +1,4 @@
-# External Provider Settings And Credential Storage
+# AI Provider Settings And Token Storage
 
 Status: V1 provider/credential boundary for issues #13 and #39
 
@@ -7,9 +7,10 @@ a user-selected provider, model, and user-provided token locally so future chat
 and meal-recognition adapters can switch configuration without hard-coded
 production secrets.
 
-The app can also store a user-provided FoodData Central API key for direct
-nutrition lookup work. Open Food Facts read lookups do not require credentials,
-so the app does not persist an Open Food Facts token or key.
+FoodData Central service credentials are not user settings. The app reads that
+key from build/app configuration when a controlled environment provides it.
+Open Food Facts read lookups do not require credentials, so the app does not
+persist an Open Food Facts token or key.
 
 ## What Is Stored
 
@@ -24,12 +25,8 @@ abstraction:
 - production app path: platform secure storage via `flutter_secure_storage`
 - test path: in-memory token storage
 
-FoodData Central API keys are stored through the same secure-storage
-abstraction under a separate storage key from AI provider tokens.
-
-The app only exposes credential state such as `Token saved`, `No token saved`,
-`FoodData Central key saved`, or `No FoodData Central key`. It does not show a
-saved secret value after storage.
+The app only exposes provider-token state such as `Token saved` or `No token
+saved`. It does not show a saved provider token value after storage.
 
 ## What Is Never Committed
 
@@ -55,18 +52,14 @@ The Me tab provides:
 - model selection
 - token save/update
 - token deletion
-- FoodData Central API key save/update
-- FoodData Central API key deletion
 - visible token state without revealing the token
-- visible key state without revealing the key
 
 Deleting a token removes the locally stored token from the current device. It
 does not delete data already sent to an external provider after real provider
 networking exists.
 
-Deleting a FoodData Central key removes the locally stored key from the current
-device. It does not remove cached nutrition results that may be created by
-future lookup work.
+FoodData Central credentials are configured outside Settings/Me. Missing
+configuration degrades to Open Food Facts and local fallback nutrition.
 
 ## Backend Boundary
 

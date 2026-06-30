@@ -55,7 +55,7 @@ Gradle properties committed to git, screenshots, tests, or fixtures.
 | Service | V1 direct app use | Credential class | Mobile binary rule | Backend/proxy trigger |
 | --- | --- | --- | --- | --- |
 | Open Food Facts | Yes, for read-only product lookup. | No read API key; custom User-Agent identifies the app. Write flows need Open Food Facts account/session handling. | Include only app identity metadata such as app name, version, and contact channel. Do not include shared account passwords. | Required for shared write credentials, contribution moderation, bulk sync, traffic above direct-user limits, or server-side cache/import jobs. |
-| FoodData Central | Yes, only with user-provided or runtime-injected data.gov key and explicit missing-key fallback. | API key assigned to a key holder; documentation says the holder is responsible for keeping it non-public. | Do not commit or package an app-owned FoodData Central key. A user-entered key may be held in secure local storage. | Required for an app-owned FoodData Central key, shared quota management, server-side search aggregation, or hidden provider credentials. |
+| FoodData Central | Yes, only with build/app configuration for a controlled environment and explicit missing-configuration fallback. | API key assigned to a key holder; documentation says the holder is responsible for keeping it non-public. | Do not commit real FoodData Central keys. Do not expose FoodData Central key entry in user settings. | Required for shared production quota management, server-side search aggregation, hidden provider credentials, or broad distribution with an app-owned key. |
 | Firebase Auth | Yes, through FlutterFire and `firebase_auth` if identity becomes active. | Firebase app configuration and Firebase API keys are public-by-design identifiers when restricted to Firebase services; auth state is user-owned. | Firebase config may be committed only after project ownership, API restrictions, Security Rules, and App Check posture are reviewed. Do not include non-Firebase API keys or admin credentials. | Required for privileged admin actions, custom claims management, server-trusted sync, callable functions with server secrets, or provider secrets outside Firebase's client model. |
 | Supabase Auth | Yes, through `supabase_flutter` with a project URL and publishable key if selected. | Publishable key is client-safe; legacy anon key is low-privilege client use; secret and service-role keys are elevated backend secrets. | A publishable key may be bundled only with Row Level Security and auth policies reviewed. Never ship `sb_secret_*` or `service_role` keys. | Required for secret/service-role operations, admin data access, bypassing RLS, server-side jobs, or policies that cannot safely expose client access. |
 | AI providers | Yes, only with user-provided tokens and explicit opt-in. | User-owned token stored locally. App-owned model/provider keys are secrets. | Do not commit, log, screenshot, or display saved token values after storage. | Required for app-owned AI keys, central billing, quota controls, audit logging, model mediation, or server-side prompt enrichment. |
@@ -124,10 +124,11 @@ holder is responsible for ensuring the key is not publicly available. The
 documentation examples include `DEMO_KEY` for exploration, but its lower rate
 limits make it inappropriate as a production app key.
 
-For V1, FoodData Central may be wired as a direct provider only when the key is
-entered by the user or injected at runtime for a controlled environment. If the
-product owner wants one shared FoodData Central key for all app users, that key
-is app-owned and requires a backend/proxy before production use.
+For V1, FoodData Central may be wired as a direct provider only when a controlled
+build/app runtime injects a key through configuration. Users should not manage
+FoodData Central credentials in Settings. If the product owner wants one shared
+FoodData Central key for broad production use, that key is app-owned and should
+move behind a backend/proxy before release.
 
 ### Firebase Auth
 

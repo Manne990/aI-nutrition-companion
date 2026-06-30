@@ -620,8 +620,8 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
         status: NutritionLookupStatus.missingApiKey,
         providerName: providerName,
         message:
-            'Add a FoodData Central API key to use generic food search. '
-            'No app-owned key is bundled.',
+            'FoodData Central lookup is not configured for this build. '
+            'Open Food Facts and local fallback nutrition remain available.',
       );
     }
 
