@@ -87,20 +87,21 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   void didUpdateWidget(covariant TodayScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.adapter != widget.adapter ||
-        oldWidget.profile != widget.profile ||
-        oldWidget.healthSignals != widget.healthSignals) {
-      _suggestions = _loadSuggestions();
-      _selectedSuggestionIndex = 0;
-      _lastAction = _SuggestionAction.none;
-      _aiChoiceMessage = null;
-    }
     if (oldWidget.repository != widget.repository ||
         oldWidget.profile != widget.profile) {
       _repository = _createRepository();
     }
     if (oldWidget.chatRepository != widget.chatRepository) {
       _chatRepository = _createChatRepository();
+    }
+    if (oldWidget.adapter != widget.adapter ||
+        oldWidget.profile != widget.profile ||
+        oldWidget.healthSignals != widget.healthSignals ||
+        oldWidget.repository != widget.repository) {
+      _suggestions = _loadSuggestions();
+      _selectedSuggestionIndex = 0;
+      _lastAction = _SuggestionAction.none;
+      _aiChoiceMessage = null;
     }
   }
 
@@ -117,9 +118,16 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   List<MealSuggestion> _loadSuggestions() {
-    return widget.adapter.mealSuggestions(
+    final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
+    final baseSuggestions = widget.adapter.mealSuggestions(
       preferences: widget.profile.toUserPreferences(),
       healthSignals: widget.healthSignals,
+    );
+    return localizeMealSuggestions(
+      suggestions: baseSuggestions,
+      summary: _repository.dailySummary(now),
+      preferences: _repository.userPreferences(),
+      quickLogSuggestions: _repository.quickLogSuggestions(now),
     );
   }
 
@@ -202,6 +210,7 @@ class _TodayScreenState extends State<TodayScreen> {
           recognitionAdapter: widget.mealRecognitionAdapter,
           now: now,
           onMealSaved: (_) => setState(() {
+            _suggestions = _loadSuggestions();
             _aiChoiceMessage = 'Meal saved. Today totals were updated.';
           }),
         ),
@@ -299,6 +308,7 @@ class _TodayScreenState extends State<TodayScreen> {
     );
     setState(() {
       _weightController.clear();
+      _suggestions = _loadSuggestions();
       _aiChoiceMessage = 'Weight saved. Trend updated for today.';
     });
   }
@@ -306,6 +316,7 @@ class _TodayScreenState extends State<TodayScreen> {
   void _confirmQuickLog(QuickLogSuggestion suggestion, DateTime now) {
     _repository.confirmQuickLogSuggestion(suggestion, eatenAt: now);
     setState(() {
+      _suggestions = _loadSuggestions();
       _aiChoiceMessage = '${suggestion.mealName} added from Quick Log.';
     });
   }
@@ -451,6 +462,13 @@ class _SuggestionCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(suggestion.summary),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              _suggestionBoundaryCopy(suggestion.source),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+            ),
             const SizedBox(height: AppSpacing.md),
             Wrap(
               spacing: AppSpacing.xs,
@@ -1126,6 +1144,19 @@ String _aiInsight(DailySummary summary, MealSuggestion? suggestion) {
     return '${suggestion.title} fits your current rhythm and keeps the next step simple.';
   }
   return 'You are about ${remaining.round()}g short of protein today. ${suggestion.title} helps without making dinner feel locked in.';
+}
+
+String _suggestionBoundaryCopy(NutritionSource source) {
+  return switch (source) {
+    NutritionSource.aiEstimated =>
+      'Practical recommendation from estimated context, not a verified nutrition fact.',
+    NutritionSource.userConfirmed =>
+      'Practical recommendation using user-confirmed local data.',
+    NutritionSource.databaseVerified =>
+      'Practical recommendation with database-verified nutrition available.',
+    NutritionSource.fallback =>
+      'Practical recommendation using fallback context; confirm details for precision.',
+  };
 }
 
 String _sourceStateLabel(DailySummary summary) {

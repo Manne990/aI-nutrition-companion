@@ -113,9 +113,13 @@ void main() {
 
     expect(find.text('Skyr bowl with berries'), findsOneWidget);
     expect(find.text('6 min prep'), findsOneWidget);
-    expect(find.text('All ingredients available'), findsOneWidget);
-    expect(find.text('Closes most of today protein gap'), findsOneWidget);
+    expect(find.text('Local afternoon option: Banana'), findsOneWidget);
+    expect(find.text('Closes a large 45g protein gap'), findsOneWidget);
     expect(find.text('AI-estimated'), findsOneWidget);
+    expect(
+      find.textContaining('not a verified nutrition fact'),
+      findsOneWidget,
+    );
 
     await _scrollUntilVisible(
       tester,
@@ -123,6 +127,29 @@ void main() {
     );
 
     expect(find.textContaining('You are about 45g short'), findsOneWidget);
+  });
+
+  testWidgets('suggestion rationale changes when no meals are confirmed', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        TodayScreen(
+          profile: profile,
+          adapter: _FixtureAdapter([firstSuggestion]),
+          repository: InMemoryNutritionRepository(seedMeals: const []),
+        ),
+      ),
+    );
+
+    await _scrollUntilVisible(tester, find.text('Skyr bowl with berries'));
+
+    expect(find.textContaining('No confirmed meals yet today'), findsOneWidget);
+    expect(
+      find.text('Starts today toward the 110g protein target'),
+      findsOneWidget,
+    );
+    expect(find.text('Local afternoon option: Banana'), findsOneWidget);
   });
 
   testWidgets('Today shows provider provenance and source gaps', (
@@ -324,6 +351,10 @@ void main() {
 
     expect(find.text('Chicken salad wrap'), findsOneWidget);
     expect(find.text('Changed to Chicken salad wrap'), findsOneWidget);
+    expect(
+      find.textContaining('fallback context; confirm details'),
+      findsOneWidget,
+    );
 
     await _scrollUntilVisible(tester, find.text('Not now'));
     await tester.tap(find.text('Not now'));
@@ -530,6 +561,15 @@ void main() {
 
     expect(
       find.textContaining('Your protein target is covered'),
+      findsOneWidget,
+    );
+    await _scrollUntilVisible(
+      tester,
+      find.text('Protein target is covered; choose for appetite and routine'),
+    );
+
+    expect(
+      find.text('Protein target is covered; choose for appetite and routine'),
       findsOneWidget,
     );
   });
