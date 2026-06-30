@@ -93,8 +93,19 @@ void main() {
 
     await _pumpApp(tester, nutritionRepository: nutritionRepository);
 
-    await _scrollUntilVisible(tester, find.text('Quick Log'));
-    await tester.tap(find.text('Log').first);
+    await _scrollUntilVisible(tester, find.text('Banana snack'));
+    final bananaSuggestion = find.ancestor(
+      of: find.text('Banana snack'),
+      matching: find.byType(DecoratedBox),
+    );
+    final bananaLogButton = find.descendant(
+      of: bananaSuggestion,
+      matching: find.widgetWithText(FilledButton, 'Log'),
+    );
+    await tester.ensureVisible(bananaLogButton);
+    await tester.pumpAndSettle();
+
+    await tester.tap(bananaLogButton);
     await tester.pumpAndSettle();
 
     expect(nutritionRepository.meals().last.name, 'Banana snack');

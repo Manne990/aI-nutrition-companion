@@ -21,6 +21,12 @@ Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Finder _textFieldWithLabel(String label) {
+  return find.byWidgetPredicate(
+    (widget) => widget is TextField && widget.decoration?.labelText == label,
+  );
+}
+
 class _FixturePhotoSource implements PhotoMealSource {
   const _FixturePhotoSource({this.capture, this.error});
 
@@ -193,7 +199,7 @@ void main() {
       ),
     );
 
-    await tester.enterText(find.byType(TextField), '737628064502');
+    await tester.enterText(_textFieldWithLabel('Barcode'), '737628064502');
     await tester.tap(find.text('Look up package'));
     await tester.pumpAndSettle();
 
@@ -284,7 +290,7 @@ void main() {
         _wrap(PhotoMealLoggingCard(repository: repository)),
       );
 
-      await tester.enterText(find.byType(TextField), '000');
+      await tester.enterText(_textFieldWithLabel('Barcode'), '000');
       await tester.tap(find.text('Look up package'));
       await tester.pumpAndSettle();
 
@@ -294,7 +300,7 @@ void main() {
       );
       expect(find.text('No packaged match'), findsOneWidget);
 
-      await tester.enterText(find.byType(TextField), '111');
+      await tester.enterText(_textFieldWithLabel('Barcode'), '111');
       await tester.tap(find.text('Look up package'));
       await tester.pumpAndSettle();
 
@@ -304,7 +310,7 @@ void main() {
       );
       expect(find.text('Provider data malformed'), findsOneWidget);
 
-      await tester.enterText(find.byType(TextField), '222');
+      await tester.enterText(_textFieldWithLabel('Barcode'), '222');
       await tester.tap(find.text('Look up package'));
       await tester.pumpAndSettle();
 
@@ -330,6 +336,111 @@ void main() {
       expect(find.text('local-fallback'), findsOneWidget);
       expect(find.text('Fallback reason:'), findsOneWidget);
       expect(find.text('Local fallback'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'generic food search shows missing key and configured FoodData Central result',
+    (tester) async {
+      final scriptedResults =
+          <NutritionLookupResult Function(NutritionLookupQuery)>[
+            (query) => NutritionLookupResult(
+              query: query,
+              status: NutritionLookupStatus.missingApiKey,
+              providerName: 'fooddata-central',
+              message:
+                  'Add a FoodData Central API key to use generic food search. No app-owned key is bundled.',
+            ),
+            (query) => NutritionLookupResult(
+              query: query,
+              status: NutritionLookupStatus.verified,
+              providerName: 'fooddata-central',
+              food: const FoodItem(
+                id: 'fdc-salmon',
+                name: 'Atlantic salmon',
+                servingDescription: '100 g cooked',
+                nutritionPerServing: MacroTotals(
+                  calories: 208,
+                  proteinGrams: 20.4,
+                  carbsGrams: 0,
+                  fatGrams: 13.4,
+                ),
+                source: SourceMetadata(
+                  source: NutritionSource.databaseVerified,
+                  label: 'FoodData Central',
+                  provider: 'fooddata-central',
+                  confidence: 0.96,
+                ),
+              ),
+              message: 'Matched FoodData Central search nutrition.',
+            ),
+          ];
+      final capturedQueries = <NutritionLookupQuery>[];
+      var lookupIndex = 0;
+      final repository = _ScriptedNutritionRepository(
+        lookup: (query) async {
+          capturedQueries.add(query);
+          return scriptedResults[lookupIndex++](query);
+        },
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          PhotoMealLoggingCard(
+            repository: repository,
+            now: DateTime(2026, 6, 29, 19, 30),
+          ),
+        ),
+      );
+
+      expect(find.text('Generic food search'), findsOneWidget);
+      expect(
+        find.text(
+          'Search FoodData Central using a user-provided key from Me. No app-owned key is bundled.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.enterText(_textFieldWithLabel('Food name'), 'salmon');
+      await _ensureVisible(tester, find.text('Search generic food'));
+      await tester.tap(find.text('Search generic food'));
+      await tester.pumpAndSettle();
+
+      expect(capturedQueries.single.foodName, 'salmon');
+      expect(capturedQueries.single.barcode, isNull);
+      expect(find.text('FoodData Central key needed'), findsOneWidget);
+      expect(
+        find.text(
+          'Add a FoodData Central API key to use generic food search. No app-owned key is bundled.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.enterText(_textFieldWithLabel('Food name'), 'salmon');
+      await _ensureVisible(tester, find.text('Search generic food'));
+      await tester.tap(find.text('Search generic food'));
+      await tester.pumpAndSettle();
+
+      expect(capturedQueries.last.foodName, 'salmon');
+      expect(find.text('Atlantic salmon'), findsOneWidget);
+      expect(find.text('FoodData Central'), findsWidgets);
+      expect(find.text('Verified source'), findsOneWidget);
+      expect(
+        find.text('Matched FoodData Central search nutrition.'),
+        findsOneWidget,
+      );
+
+      await _ensureVisible(tester, find.text('Save generic food'));
+      await tester.tap(find.text('Save generic food'));
+      await tester.pumpAndSettle();
+
+      final savedMeal = repository.meals().last;
+      expect(savedMeal.name, 'Atlantic salmon');
+      expect(savedMeal.source.source, NutritionSource.userConfirmed);
+      expect(savedMeal.items.single.food.source.provider, 'fooddata-central');
+      expect(savedMeal.items.single.food.source.isVerified, isTrue);
+      expect(savedMeal.knownMacroTotals.proteinGrams, 20.4);
+      expect(find.text('Generic food saved to today.'), findsOneWidget);
     },
   );
 

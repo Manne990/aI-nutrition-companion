@@ -34,13 +34,16 @@ class PhotoMealLoggingCard extends StatefulWidget {
 class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
   late final PhotoMealSource _photoSource;
   final TextEditingController _barcodeController = TextEditingController();
+  final TextEditingController _genericFoodController = TextEditingController();
   MealEstimate? _estimate;
   Meal? _savedMeal;
   NutritionLookupResult? _packagedLookupResult;
+  NutritionLookupResult? _genericLookupResult;
   String? _statusMessage;
   String? _errorMessage;
   var _isWorking = false;
   var _isLookingUpPackagedFood = false;
+  var _isLookingUpGenericFood = false;
   var _drafts = <_EditableMealItem>[];
 
   @override
@@ -52,6 +55,7 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
   @override
   void dispose() {
     _barcodeController.dispose();
+    _genericFoodController.dispose();
     super.dispose();
   }
 
@@ -128,6 +132,16 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
             onSave: _packagedLookupResult?.food == null
                 ? null
                 : _savePackagedFood,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _GenericFoodSearch(
+            controller: _genericFoodController,
+            isLookingUp: _isLookingUpGenericFood,
+            result: _genericLookupResult,
+            onLookup: _lookupGenericFood,
+            onSave: _genericLookupResult?.food == null
+                ? null
+                : _saveGenericFood,
           ),
           if (_estimate != null) ...[
             const SizedBox(height: AppSpacing.lg),
@@ -258,6 +272,42 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
     });
   }
 
+  Future<void> _lookupGenericFood() async {
+    final foodName = _genericFoodController.text.trim();
+    if (foodName.isEmpty) {
+      setState(() {
+        _genericLookupResult = const NutritionLookupResult(
+          query: NutritionLookupQuery(foodName: 'Generic food'),
+          status: NutritionLookupStatus.providerError,
+          providerName: 'fooddata-central',
+          message: 'Enter a food name to search FoodData Central.',
+        );
+        _savedMeal = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLookingUpGenericFood = true;
+      _genericLookupResult = null;
+      _savedMeal = null;
+      _errorMessage = null;
+      _statusMessage = null;
+    });
+
+    final result = await widget.repository.lookupFood(
+      NutritionLookupQuery(foodName: foodName),
+    );
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isLookingUpGenericFood = false;
+      _genericLookupResult = result;
+    });
+  }
+
   void _savePackagedFood() {
     final result = _packagedLookupResult;
     final food = result?.food;
@@ -292,6 +342,44 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
     setState(() {
       _savedMeal = meal;
       _statusMessage = 'Packaged food saved to today.';
+      _errorMessage = null;
+    });
+  }
+
+  void _saveGenericFood() {
+    final result = _genericLookupResult;
+    final food = result?.food;
+    if (food == null) {
+      return;
+    }
+
+    final savedAt = widget.now ?? DateTime(2026, 6, 29, 17, 56);
+    final meal = Meal(
+      id: 'generic-meal-${savedAt.millisecondsSinceEpoch}',
+      name: food.name,
+      eatenAt: savedAt,
+      items: [
+        MealItem(
+          id: 'generic-${food.id}',
+          food: food,
+          servings: 1,
+          source: const SourceMetadata(
+            source: NutritionSource.userConfirmed,
+            label: 'User confirmed generic food',
+          ),
+        ),
+      ],
+      source: const SourceMetadata(
+        source: NutritionSource.userConfirmed,
+        label: 'User confirmed generic meal',
+      ),
+    );
+
+    widget.repository.saveMeal(meal);
+    widget.onMealSaved?.call(meal);
+    setState(() {
+      _savedMeal = meal;
+      _statusMessage = 'Generic food saved to today.';
       _errorMessage = null;
     });
   }
@@ -459,7 +547,11 @@ class _PackagedFoodLookup extends StatelessWidget {
             ],
             if (result != null) ...[
               const SizedBox(height: AppSpacing.md),
-              _PackagedFoodLookupResult(result: result, onSave: onSave),
+              _LookupResult(
+                result: result,
+                kind: _LookupKind.packaged,
+                onSave: onSave,
+              ),
             ],
           ],
         ),
@@ -468,22 +560,115 @@ class _PackagedFoodLookup extends StatelessWidget {
   }
 }
 
-class _PackagedFoodLookupResult extends StatelessWidget {
-  const _PackagedFoodLookupResult({required this.result, required this.onSave});
+class _GenericFoodSearch extends StatelessWidget {
+  const _GenericFoodSearch({
+    required this.controller,
+    required this.isLookingUp,
+    required this.result,
+    required this.onLookup,
+    required this.onSave,
+  });
+
+  final TextEditingController controller;
+  final bool isLookingUp;
+  final NutritionLookupResult? result;
+  final VoidCallback onLookup;
+  final VoidCallback? onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = this.result;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.softIvory,
+        border: Border.all(color: AppColors.oat),
+        borderRadius: BorderRadius.circular(AppRadii.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.manage_search, color: AppColors.ink),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Generic food search',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Search FoodData Central using a user-provided key from Me. No app-owned key is bundled.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.mutedInk),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Food name',
+                hintText: 'e.g. salmon, oats, avocado',
+              ),
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => isLookingUp ? null : onLookup(),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              width: double.infinity,
+              child: AppSecondaryButton(
+                label: isLookingUp ? 'Searching...' : 'Search generic food',
+                icon: Icons.search,
+                onPressed: isLookingUp ? null : onLookup,
+              ),
+            ),
+            if (isLookingUp) ...[
+              const SizedBox(height: AppSpacing.sm),
+              const LinearProgressIndicator(),
+            ],
+            if (result != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              _LookupResult(
+                result: result,
+                kind: _LookupKind.generic,
+                onSave: onSave,
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _LookupKind { packaged, generic }
+
+class _LookupResult extends StatelessWidget {
+  const _LookupResult({
+    required this.result,
+    required this.kind,
+    required this.onSave,
+  });
 
   final NutritionLookupResult result;
+  final _LookupKind kind;
   final VoidCallback? onSave;
 
   @override
   Widget build(BuildContext context) {
     final food = result.food;
-    final message = result.message ?? _statusCopy(result.status);
+    final message = result.message ?? _statusCopy(result.status, kind);
     if (food == null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppChip(
-            label: _statusCopy(result.status),
+            label: _statusCopy(result.status, kind),
             icon: _statusIcon(result.status),
             tone: AppChipTone.accent,
           ),
@@ -503,7 +688,7 @@ class _PackagedFoodLookupResult extends StatelessWidget {
           children: [
             SourceChip.fromMetadata(metadata: food.source),
             AppChip(
-              label: _statusCopy(result.status),
+              label: _statusCopy(result.status, kind),
               icon: _statusIcon(result.status),
               tone: result.isVerified
                   ? AppChipTone.success
@@ -549,7 +734,9 @@ class _PackagedFoodLookupResult extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: AppPrimaryButton(
-            label: 'Save packaged food',
+            label: kind == _LookupKind.packaged
+                ? 'Save packaged food'
+                : 'Save generic food',
             icon: Icons.check_circle_outline,
             onPressed: onSave,
           ),
@@ -886,12 +1073,16 @@ String _numberLabel(double value) {
   return value.toStringAsFixed(1);
 }
 
-String _statusCopy(NutritionLookupStatus status) {
+String _statusCopy(NutritionLookupStatus status, _LookupKind kind) {
   return switch (status) {
     NutritionLookupStatus.verified => 'Verified source',
     NutritionLookupStatus.fallback => 'Source gap fallback',
-    NutritionLookupStatus.notFound => 'No packaged match',
-    NutritionLookupStatus.missingApiKey => 'Provider setup needed',
+    NutritionLookupStatus.notFound =>
+      kind == _LookupKind.packaged ? 'No packaged match' : 'No generic match',
+    NutritionLookupStatus.missingApiKey =>
+      kind == _LookupKind.packaged
+          ? 'Provider setup needed'
+          : 'FoodData Central key needed',
     NutritionLookupStatus.timeout => 'Provider timeout',
     NutritionLookupStatus.rateLimited => 'Provider rate limit',
     NutritionLookupStatus.malformedResponse => 'Provider data malformed',
