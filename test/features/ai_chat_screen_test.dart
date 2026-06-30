@@ -22,6 +22,21 @@ class _FailingChatAdapter implements AiChatAdapter {
   }
 }
 
+class _ProviderFailureChatAdapter implements AiChatAdapter {
+  const _ProviderFailureChatAdapter(this.kind);
+
+  final AiProviderFailureKind kind;
+
+  @override
+  Future<AiChatResponse> sendMessage({
+    required String prompt,
+    required AiChatContext context,
+    required List<AiChatMessage> history,
+  }) {
+    throw AiProviderException(kind, 'simulated provider failure');
+  }
+}
+
 Widget _wrap(Widget child) {
   return MaterialApp(theme: AppTheme.light(), home: child);
 }
@@ -95,7 +110,40 @@ void main() {
 
     expect(find.text('What should I eat next?'), findsOneWidget);
     expect(
-      find.text('Companion response unavailable. Try again.'),
+      find.text(
+        'Companion response unavailable. Try again, use mock AI, or keep planning manually.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('renders provider rate limit with recovery options', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrap(
+        AiChatScreen(
+          profile: _profile(),
+          nutritionRepository: InMemoryNutritionRepository(),
+          chatRepository: InMemoryAiChatRepository(),
+          configuration: _configuration,
+          adapter: const _ProviderFailureChatAdapter(
+            AiProviderFailureKind.rateLimited,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'What should I eat next?');
+    await tester.tap(find.byIcon(Icons.send_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('What should I eat next?'), findsOneWidget);
+    expect(
+      find.text(
+        'Provider rate limit reached. Try again later, use mock AI, or keep planning manually.',
+      ),
       findsOneWidget,
     );
   });

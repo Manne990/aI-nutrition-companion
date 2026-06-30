@@ -218,7 +218,7 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
       setState(() {
         _packagedLookupResult = const NutritionLookupResult(
           query: NutritionLookupQuery(foodName: 'Packaged food'),
-          status: NutritionLookupStatus.providerError,
+          status: NutritionLookupStatus.notFound,
           providerName: 'open-food-facts',
           message: 'Enter a barcode to look up packaged food.',
         );
@@ -878,6 +878,10 @@ String _statusCopy(NutritionLookupStatus status) {
     NutritionLookupStatus.fallback => 'Source gap fallback',
     NutritionLookupStatus.notFound => 'No packaged match',
     NutritionLookupStatus.missingApiKey => 'Provider setup needed',
+    NutritionLookupStatus.timeout => 'Provider timeout',
+    NutritionLookupStatus.rateLimited => 'Provider rate limit',
+    NutritionLookupStatus.malformedResponse => 'Provider data malformed',
+    NutritionLookupStatus.providerUnavailable => 'Provider unavailable',
     NutritionLookupStatus.providerError => 'Provider unavailable',
   };
 }
@@ -888,6 +892,10 @@ IconData _statusIcon(NutritionLookupStatus status) {
     NutritionLookupStatus.fallback => Icons.info_outline,
     NutritionLookupStatus.notFound => Icons.search_off,
     NutritionLookupStatus.missingApiKey => Icons.key_off_outlined,
+    NutritionLookupStatus.timeout => Icons.timer_off_outlined,
+    NutritionLookupStatus.rateLimited => Icons.hourglass_disabled_outlined,
+    NutritionLookupStatus.malformedResponse => Icons.data_object_outlined,
+    NutritionLookupStatus.providerUnavailable => Icons.cloud_off_outlined,
     NutritionLookupStatus.providerError => Icons.error_outline,
   };
 }

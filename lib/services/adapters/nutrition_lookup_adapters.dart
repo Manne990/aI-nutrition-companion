@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import '../../domain/models/nutrition.dart';
@@ -241,7 +242,7 @@ class OpenFoodFactsNutritionProvider implements NutritionLookupProvider {
     if (simulateFailure) {
       return NutritionLookupResult(
         query: query,
-        status: NutritionLookupStatus.providerError,
+        status: NutritionLookupStatus.providerUnavailable,
         providerName: providerName,
         message: 'Open Food Facts lookup failed in the adapter boundary.',
       );
@@ -261,7 +262,7 @@ class OpenFoodFactsNutritionProvider implements NutritionLookupProvider {
     if (response == null) {
       return NutritionLookupResult(
         query: query,
-        status: NutritionLookupStatus.providerError,
+        status: NutritionLookupStatus.providerUnavailable,
         providerName: providerName,
         message: 'Open Food Facts lookup failed in the adapter boundary.',
       );
@@ -276,10 +277,20 @@ class OpenFoodFactsNutritionProvider implements NutritionLookupProvider {
       );
     }
 
+    if (response.statusCode == 429) {
+      return NutritionLookupResult(
+        query: query,
+        status: NutritionLookupStatus.rateLimited,
+        providerName: providerName,
+        message:
+            'Open Food Facts rate limit was reached. Try again later or keep local fallback nutrition.',
+      );
+    }
+
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return NutritionLookupResult(
         query: query,
-        status: NutritionLookupStatus.providerError,
+        status: NutritionLookupStatus.providerUnavailable,
         providerName: providerName,
         message:
             'Open Food Facts returned HTTP ${response.statusCode} for barcode $barcode.',
@@ -290,7 +301,7 @@ class OpenFoodFactsNutritionProvider implements NutritionLookupProvider {
     if (parsed == null) {
       return NutritionLookupResult(
         query: query,
-        status: NutritionLookupStatus.providerError,
+        status: NutritionLookupStatus.malformedResponse,
         providerName: providerName,
         message: 'Open Food Facts returned malformed nutrition data.',
       );
@@ -520,7 +531,7 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
     if (simulateFailure) {
       return NutritionLookupResult(
         query: query,
-        status: NutritionLookupStatus.providerError,
+        status: NutritionLookupStatus.providerUnavailable,
         providerName: providerName,
         message: 'FoodData Central lookup failed in the adapter boundary.',
       );
@@ -546,7 +557,7 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
         if (food == null) {
           return NutritionLookupResult(
             query: query,
-            status: NutritionLookupStatus.providerError,
+            status: NutritionLookupStatus.malformedResponse,
             providerName: providerName,
             message:
                 'FoodData Central response did not include calories, protein, '
@@ -561,10 +572,25 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
           food: food,
           message: 'Matched FoodData Central search nutrition.',
         );
+      } on TimeoutException {
+        return NutritionLookupResult(
+          query: query,
+          status: NutritionLookupStatus.timeout,
+          providerName: providerName,
+          message: 'FoodData Central lookup timed out.',
+        );
+      } on FoodDataCentralRateLimitException {
+        return NutritionLookupResult(
+          query: query,
+          status: NutritionLookupStatus.rateLimited,
+          providerName: providerName,
+          message:
+              'FoodData Central rate limit was reached. Try again later or use local fallback nutrition.',
+        );
       } catch (_) {
         return NutritionLookupResult(
           query: query,
-          status: NutritionLookupStatus.providerError,
+          status: NutritionLookupStatus.providerUnavailable,
           providerName: providerName,
           message: 'FoodData Central lookup failed in the adapter boundary.',
         );
@@ -589,6 +615,10 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
       message: 'Matched configured FoodData Central nutrition.',
     );
   }
+}
+
+class FoodDataCentralRateLimitException implements Exception {
+  const FoodDataCentralRateLimitException();
 }
 
 Map<String, Object?>? _asObjectMap(Object? value) {

@@ -95,7 +95,7 @@ class NutritionEnrichmentService {
     } on TimeoutException {
       return NutritionLookupResult(
         query: query,
-        status: NutritionLookupStatus.providerError,
+        status: NutritionLookupStatus.timeout,
         providerName: provider.providerName,
         message: '${provider.providerName} lookup timed out.',
       );
