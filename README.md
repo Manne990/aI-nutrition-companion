@@ -104,6 +104,11 @@ V1 should prefer direct app integrations only when the provider contract is
 public, user-owned, or explicitly client-safe; app-owned secrets require a
 backend or proxy before production use.
 
+The V1 auth boundary is documented in
+[`docs/auth-provider-boundary.md`](docs/auth-provider-boundary.md). The default
+implementation is mock local auth with signed-out use preserved; no Firebase,
+Supabase, OAuth, or backend credential is required for local development.
+
 The FoodData Central adapter contract reports an explicit missing-key fallback
 state until a user-provided or runtime-injected API key is available. The V1
 mobile boundary parses production-shaped FoodData Central search payloads behind

@@ -4,6 +4,7 @@ import 'app_shell.dart';
 import 'theme/app_theme.dart';
 import '../domain/repositories/ai_chat_repository.dart';
 import '../domain/repositories/ai_settings_repository.dart';
+import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/nutrition_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
@@ -13,6 +14,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
     super.key,
     this.onboardingRepository,
     this.aiSettingsRepository,
+    this.authRepository,
     this.healthRepository,
     this.aiChatRepository,
     this.nutritionRepository,
@@ -20,6 +22,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
 
   final OnboardingRepository? onboardingRepository;
   final AiSettingsRepository? aiSettingsRepository;
+  final AuthRepository? authRepository;
   final HealthRepository? healthRepository;
   final AiChatRepository? aiChatRepository;
   final NutritionRepository? nutritionRepository;
@@ -45,6 +48,9 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
     final aiSettingsRepository = widget.aiSettingsRepository == null
         ? await SharedPreferencesAiSettingsRepository.create()
         : widget.aiSettingsRepository!;
+    final authRepository = widget.authRepository == null
+        ? await SharedPreferencesAuthRepository.create()
+        : widget.authRepository!;
     final healthRepository = widget.healthRepository == null
         ? await SharedPreferencesHealthRepository.create()
         : widget.healthRepository!;
@@ -55,6 +61,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
     return _AppRepositories(
       onboardingRepository: onboardingRepository,
       aiSettingsRepository: aiSettingsRepository,
+      authRepository: authRepository,
       healthRepository: healthRepository,
       aiChatRepository: aiChatRepository,
       nutritionRepository: widget.nutritionRepository,
@@ -75,6 +82,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
             return AppShell(
               onboardingRepository: repositories.onboardingRepository,
               aiSettingsRepository: repositories.aiSettingsRepository,
+              authRepository: repositories.authRepository,
               healthRepository: repositories.healthRepository,
               aiChatRepository: repositories.aiChatRepository,
               nutritionRepository: repositories.nutritionRepository,
@@ -93,6 +101,7 @@ class _AppRepositories {
   const _AppRepositories({
     required this.onboardingRepository,
     required this.aiSettingsRepository,
+    required this.authRepository,
     required this.healthRepository,
     required this.aiChatRepository,
     this.nutritionRepository,
@@ -100,6 +109,7 @@ class _AppRepositories {
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
+  final AuthRepository authRepository;
   final HealthRepository healthRepository;
   final AiChatRepository aiChatRepository;
   final NutritionRepository? nutritionRepository;

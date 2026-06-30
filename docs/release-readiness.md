@@ -46,7 +46,8 @@ Current app facts from this repository:
 - iOS currently declares camera and photo library usage descriptions.
 - `image_picker` is present for meal photo flows.
 - `shared_preferences` is present for local app state.
-- No account system exists yet.
+- A mock local auth boundary exists, but no real account provider, backend auth,
+  cloud sync, or remote user account exists yet.
 - No backend exists yet.
 - User-provided AI token storage is scaffolded through
   `docs/ai-provider-settings.md` and platform secure storage.
@@ -341,8 +342,9 @@ enter a token only after accepting the local-storage risk.
 
 ## Account And Data Deletion Requirements
 
-V1 currently has no accounts. If accounts, cloud sync, remote backups, billing,
-or family/team features are introduced later:
+V1 currently has only mock local auth and no remote accounts. If real accounts,
+cloud sync, remote backups, billing, or family/team features are introduced
+later:
 
 - Add an in-app account deletion path where platform policy requires it.
 - Add a hosted data deletion request path.

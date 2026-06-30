@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_theme.dart';
 import '../../domain/models/ai_settings.dart';
+import '../../domain/models/auth.dart';
 import '../../domain/models/health.dart';
 import '../../domain/models/onboarding.dart';
 import '../../domain/repositories/ai_settings_repository.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/health_repository.dart';
 import '../../shared/widgets/app_action_buttons.dart';
 import '../../shared/widgets/app_chip.dart';
@@ -15,18 +17,24 @@ class MeScreen extends StatefulWidget {
     super.key,
     required this.profile,
     required this.aiSettingsRepository,
+    required this.authRepository,
+    required this.authState,
     required this.healthRepository,
     required this.healthState,
     required this.onAiSettingsChanged,
+    required this.onAuthStateChanged,
     required this.onHealthStateChanged,
     required this.onResetOnboarding,
   });
 
   final OnboardingProfile profile;
   final AiSettingsRepository aiSettingsRepository;
+  final AuthRepository authRepository;
+  final AuthAccountState authState;
   final HealthRepository healthRepository;
   final HealthConnectionState healthState;
   final Future<void> Function() onAiSettingsChanged;
+  final Future<void> Function() onAuthStateChanged;
   final Future<void> Function() onHealthStateChanged;
   final Future<void> Function() onResetOnboarding;
 
@@ -36,6 +44,7 @@ class MeScreen extends StatefulWidget {
 
 class _MeScreenState extends State<MeScreen> {
   late Future<_AiSettingsViewState> _aiSettingsFuture;
+  late AuthAccountState _authState;
   late HealthConnectionState _healthState;
   final TextEditingController _tokenController = TextEditingController();
   final TextEditingController _foodDataCentralKeyController =
@@ -49,6 +58,7 @@ class _MeScreenState extends State<MeScreen> {
   void initState() {
     super.initState();
     _aiSettingsFuture = _loadAiSettings();
+    _authState = widget.authState;
     _healthState = widget.healthState;
   }
 
@@ -64,6 +74,9 @@ class _MeScreenState extends State<MeScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.healthState != widget.healthState) {
       _healthState = widget.healthState;
+    }
+    if (oldWidget.authState != widget.authState) {
+      _authState = widget.authState;
     }
   }
 
@@ -134,6 +147,8 @@ class _MeScreenState extends State<MeScreen> {
             );
           },
         ),
+        const SizedBox(height: 16),
+        _buildAccountCard(context),
         const SizedBox(height: 16),
         _buildHealthConnectionCard(context),
         const SizedBox(height: 16),
@@ -469,6 +484,70 @@ class _MeScreenState extends State<MeScreen> {
     );
   }
 
+  Widget _buildAccountCard(BuildContext context) {
+    final authState = _authState;
+
+    return AppSectionCard(
+      title: 'Account',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(authState.explainer),
+          if (authState.statusDetail != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              authState.statusDetail!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
+            children: [
+              AppChip(
+                label: authState.statusLabel,
+                icon: _authStatusIcon(authState.status),
+                tone: _authStatusTone(authState.status),
+              ),
+              AppChip(
+                label: authState.provider.label,
+                icon: Icons.account_circle_outlined,
+              ),
+              if (authState.userLabel != null)
+                AppChip(
+                  label: authState.userLabel!,
+                  icon: Icons.person_outline,
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (authState.isSignedIn)
+            AppSecondaryButton(
+              label: 'Sign out',
+              icon: Icons.logout,
+              onPressed: _signOut,
+            )
+          else
+            AppPrimaryButton(
+              label: 'Use mock account',
+              icon: Icons.login,
+              onPressed: _signInWithMock,
+            ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'Firebase Auth or Supabase Auth can replace this boundary later. V1 does not include a real auth project, custom backend, or nutrition sync.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _saveAiSettings() async {
     final settings = _draftSettings ?? AiProviderSettings.defaults;
     await widget.aiSettingsRepository.saveSettings(settings);
@@ -541,6 +620,22 @@ class _MeScreenState extends State<MeScreen> {
     });
   }
 
+  Future<void> _signInWithMock() async {
+    final nextState = await widget.authRepository.signInWithMock();
+    await widget.onAuthStateChanged();
+    setState(() {
+      _authState = nextState;
+    });
+  }
+
+  Future<void> _signOut() async {
+    final nextState = await widget.authRepository.signOut();
+    await widget.onAuthStateChanged();
+    setState(() {
+      _authState = nextState;
+    });
+  }
+
   Future<void> _connectHealth() async {
     final nextState = await widget.healthRepository.requestConnection();
     await widget.onHealthStateChanged();
@@ -603,6 +698,22 @@ AppChipTone _healthStatusTone(HealthConnectionStatus status) {
     HealthConnectionStatus.disconnected => AppChipTone.neutral,
     HealthConnectionStatus.denied => AppChipTone.accent,
     HealthConnectionStatus.unavailable => AppChipTone.accent,
+  };
+}
+
+IconData _authStatusIcon(AuthConnectionStatus status) {
+  return switch (status) {
+    AuthConnectionStatus.signedOut => Icons.radio_button_unchecked,
+    AuthConnectionStatus.signedIn => Icons.check_circle_outline,
+    AuthConnectionStatus.providerUnavailable => Icons.error_outline,
+  };
+}
+
+AppChipTone _authStatusTone(AuthConnectionStatus status) {
+  return switch (status) {
+    AuthConnectionStatus.signedOut => AppChipTone.neutral,
+    AuthConnectionStatus.signedIn => AppChipTone.success,
+    AuthConnectionStatus.providerUnavailable => AppChipTone.accent,
   };
 }
 

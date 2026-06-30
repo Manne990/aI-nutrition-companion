@@ -156,6 +156,9 @@ offline behavior.
 
 ## Documentation Dependencies
 
+- `docs/auth-provider-boundary.md` records the V1 provider-neutral auth seam and
+  keeps mock local auth as the default until a real Firebase or Supabase project
+  is intentionally introduced.
 - `docs/ai-provider-settings.md` remains the user-token storage boundary for AI
   providers and should be extended for FoodData Central user keys if #39 adds
   nutrition credentials.
