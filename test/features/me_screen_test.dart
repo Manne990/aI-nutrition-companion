@@ -96,25 +96,29 @@ Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
-  testWidgets('AI settings default to mock mode without token', (tester) async {
+  testWidgets('AI settings default to OpenAI without token', (tester) async {
     final repository = InMemoryAiSettingsRepository();
 
     await _pumpMe(tester, repository);
 
     expect(find.text('AI provider'), findsOneWidget);
-    expect(find.text('Mock AI'), findsOneWidget);
-    expect(find.text('mock-companion-v1'), findsOneWidget);
+    expect(find.text('OpenAI'), findsOneWidget);
+    expect(find.text('Latest model: gpt-4.1-mini'), findsOneWidget);
     expect(find.text('No token saved'), findsOneWidget);
     expect(find.text('Secure local storage'), findsWidgets);
     expect(
-      find.textContaining('Mock AI is the default for tests and local CI'),
+      find.textContaining('Add a token before real provider mode can be used'),
       findsOneWidget,
     );
-    expect(find.textContaining('Real provider mode may send'), findsOneWidget);
+    expect(find.textContaining('Chat requests can send'), findsOneWidget);
+    expect(find.textContaining('OpenAI dashboard'), findsOneWidget);
     expect(
       find.textContaining('Save only a user-owned provider token'),
       findsOneWidget,
     );
+    expect(find.text('Mock AI'), findsNothing);
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    expect(find.text('Update token'), findsNothing);
   });
 
   testWidgets('Me shows privacy and safety disclosures', (tester) async {
@@ -135,7 +139,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('V1 is local-first with mock defaults'),
+      find.textContaining('V1 is local-first with signed-out use'),
       findsOneWidget,
     );
     expect(
@@ -203,32 +207,43 @@ void main() {
     expect(find.text('Use mock account'), findsOneWidget);
   });
 
-  testWidgets('user can select provider and model', (tester) async {
+  testWidgets('user can select provider and latest model is automatic', (
+    tester,
+  ) async {
     final repository = InMemoryAiSettingsRepository();
 
     await _pumpMe(tester, repository);
     await _openProviderMenu(tester);
-    await tester.tap(find.text('OpenAI').last);
+    await tester.tap(find.text('Gemini').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('gpt-4.1-mini'), findsOneWidget);
+    expect(find.text('Latest model: gemini-1.5-flash-latest'), findsOneWidget);
+    expect(find.textContaining('Google AI Studio'), findsOneWidget);
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
 
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await _openProviderMenu(tester);
+    await tester.tap(find.text('Anthropic').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('gpt-4.1').last);
-    await tester.pumpAndSettle();
+
+    expect(find.text('Latest model: claude-3-5-haiku-latest'), findsOneWidget);
+    expect(find.textContaining('Anthropic Console'), findsOneWidget);
 
     await tester.tap(find.text('Save AI settings'));
     await tester.pumpAndSettle();
 
     final settings = await repository.loadSettings();
 
-    expect(settings.provider, AiProvider.openai);
-    expect(settings.model, 'gpt-4.1');
-    expect(find.text('OpenAI gpt-4.1 saved.'), findsOneWidget);
+    expect(settings.provider, AiProvider.anthropic);
+    expect(settings.model, 'claude-3-5-haiku-latest');
+    expect(
+      find.text('Anthropic saved with claude-3-5-haiku-latest.'),
+      findsOneWidget,
+    );
   });
 
-  testWidgets('user can save, update, and delete token state', (tester) async {
+  testWidgets('user can save and delete token state without update path', (
+    tester,
+  ) async {
     final repository = InMemoryAiSettingsRepository();
 
     await _pumpMe(tester, repository);
@@ -244,17 +259,9 @@ void main() {
     expect(find.text('Token saved'), findsOneWidget);
     expect(find.text('entered provider value'), findsNothing);
     expect(find.text('Token saved locally.'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const Key('ai-provider-token-field')),
-      'updated provider value',
-    );
-    await _scrollUntilVisible(tester, find.text('Update token'));
-    await tester.tap(find.text('Update token'));
-    await tester.pumpAndSettle();
-
-    expect((await repository.loadTokenState()).hasToken, isTrue);
-    expect(find.text('updated provider value'), findsNothing);
+    expect(find.byKey(const Key('ai-provider-token-field')), findsNothing);
+    expect(find.text('Save token'), findsNothing);
+    expect(find.text('Update token'), findsNothing);
 
     await _scrollUntilVisible(tester, find.text('Delete token'));
     await tester.tap(find.text('Delete token'));
@@ -262,6 +269,8 @@ void main() {
 
     expect((await repository.loadTokenState()).hasToken, isFalse);
     expect(find.text('No token saved'), findsOneWidget);
+    expect(find.byKey(const Key('ai-provider-token-field')), findsOneWidget);
+    expect(find.text('Save token'), findsOneWidget);
     expect(find.text('Token deleted from this device.'), findsOneWidget);
   });
 

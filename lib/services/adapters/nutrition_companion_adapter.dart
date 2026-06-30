@@ -25,7 +25,7 @@ class MockNutritionCompanionAdapter implements NutritionCompanionAdapter {
         : '${preferences!.dietaryPreferences.first}, quick to make';
     final provider = configuration?.providerLabel ?? 'Mock AI';
     final model = configuration?.settings.model ?? 'mock-companion-v1';
-    final source = configuration?.shouldUseMock ?? true
+    final source = configuration?.canUseRealProvider ?? false
         ? NutritionSource.aiEstimated
         : NutritionSource.fallback;
     final healthContext = _healthContext(healthSignals);

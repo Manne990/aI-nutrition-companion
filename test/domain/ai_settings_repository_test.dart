@@ -4,6 +4,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('provider catalog exposes only approved real providers', () {
+    expect(AiProviderCatalog.options.map((option) => option.label), [
+      'OpenAI',
+      'Gemini',
+      'Anthropic',
+    ]);
+    expect(AiProviderCatalog.options.map((option) => option.provider), [
+      AiProvider.openai,
+      AiProvider.gemini,
+      AiProvider.anthropic,
+    ]);
+    expect(AiProviderCatalog.options.map((option) => option.latestModel), [
+      'gpt-4.1-mini',
+      'gemini-1.5-flash-latest',
+      'claude-3-5-haiku-latest',
+    ]);
+  });
+
   test('provider settings normalize unknown or mismatched models', () {
     final settings = AiProviderSettings.fromJson({
       'provider': 'openai',
@@ -13,10 +31,23 @@ void main() {
     expect(settings.provider, AiProvider.openai);
     expect(settings.model, 'gpt-4.1-mini');
 
-    final switched = settings.copyWith(provider: AiProvider.anthropic);
+    final gemini = settings.copyWith(provider: AiProvider.gemini);
+
+    expect(gemini.provider, AiProvider.gemini);
+    expect(gemini.model, 'gemini-1.5-flash-latest');
+
+    final switched = gemini.copyWith(provider: AiProvider.anthropic);
 
     expect(switched.provider, AiProvider.anthropic);
     expect(switched.model, 'claude-3-5-haiku-latest');
+
+    final unknownProvider = AiProviderSettings.fromJson({
+      'provider': 'mock',
+      'model': 'mock-companion-v1',
+    });
+
+    expect(unknownProvider.provider, AiProvider.openai);
+    expect(unknownProvider.model, 'gpt-4.1-mini');
   });
 
   test(
@@ -25,8 +56,8 @@ void main() {
       final repository = InMemoryAiSettingsRepository();
       final defaultSettings = await repository.loadSettings();
 
-      expect(defaultSettings.provider, AiProvider.mock);
-      expect(defaultSettings.model, 'mock-companion-v1');
+      expect(defaultSettings.provider, AiProvider.openai);
+      expect(defaultSettings.model, 'gpt-4.1-mini');
       expect((await repository.loadTokenState()).hasToken, isFalse);
 
       await repository.saveSettings(
@@ -37,10 +68,9 @@ void main() {
       final configuration = await repository.loadAdapterConfiguration();
 
       expect(configuration.settings.provider, AiProvider.openai);
-      expect(configuration.settings.model, 'gpt-4.1');
+      expect(configuration.settings.model, 'gpt-4.1-mini');
       expect(configuration.tokenState.hasToken, isTrue);
       expect(configuration.canUseRealProvider, isTrue);
-      expect(configuration.shouldUseMock, isFalse);
       expect(await repository.readProviderToken(), 'entered provider value');
 
       await repository.saveToken('updated provider value');
@@ -157,7 +187,6 @@ void main() {
     );
 
     expect(configuration.canUseRealProvider, isFalse);
-    expect(configuration.shouldUseMock, isFalse);
     expect(configuration.modeLabel, 'OpenAI needs token');
   });
 

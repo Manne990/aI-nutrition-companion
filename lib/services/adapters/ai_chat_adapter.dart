@@ -81,14 +81,6 @@ class RealProviderAiChatAdapter implements AiChatAdapter {
     required AiChatContext context,
     required List<AiChatMessage> history,
   }) async {
-    if (configuration.settings.usesMockProvider) {
-      return const MockAiChatAdapter().sendMessage(
-        prompt: prompt,
-        context: context,
-        history: history,
-      );
-    }
-
     if (!configuration.tokenState.isAvailable) {
       throw AiProviderException(
         AiProviderFailureKind.missingCredential,
@@ -121,17 +113,19 @@ class RealProviderAiChatAdapter implements AiChatAdapter {
         history: history,
         model: settings.model,
       ),
-      AiProvider.anthropic => _sendAnthropic(
+      AiProvider.gemini => _sendGemini(
         token: token.trim(),
         prompt: prompt,
         context: context,
         history: history,
         model: settings.model,
       ),
-      AiProvider.mock => const MockAiChatAdapter().sendMessage(
+      AiProvider.anthropic => _sendAnthropic(
+        token: token.trim(),
         prompt: prompt,
         context: context,
         history: history,
+        model: settings.model,
       ),
     };
   }
@@ -194,6 +188,80 @@ class RealProviderAiChatAdapter implements AiChatAdapter {
       );
     }
     return AiChatResponse(message: content.trim());
+  }
+
+  Future<AiChatResponse> _sendGemini({
+    required String token,
+    required String prompt,
+    required AiChatContext context,
+    required List<AiChatMessage> history,
+    required String model,
+  }) async {
+    final requestBody = jsonEncode({
+      'systemInstruction': {
+        'parts': [
+          {'text': _systemPrompt(context)},
+        ],
+      },
+      'contents': [
+        for (final message in _requestHistory(prompt, history))
+          {
+            'role': message.isUser ? 'user' : 'model',
+            'parts': [
+              {'text': message.content},
+            ],
+          },
+        {
+          'role': 'user',
+          'parts': [
+            {'text': prompt.trim()},
+          ],
+        },
+      ],
+      'generationConfig': {'temperature': 0.3},
+    });
+
+    final response = await _postProvider(
+      uri: Uri.https(
+        'generativelanguage.googleapis.com',
+        '/v1beta/models/$model:generateContent',
+        {'key': token},
+      ),
+      headers: {HttpHeaders.contentTypeHeader: 'application/json'},
+      body: requestBody,
+    );
+    final body = _decodeResponseMap(response.body);
+    final candidates = body['candidates'];
+    if (candidates is! List || candidates.isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.malformedResponse,
+        'Gemini response did not include candidates.',
+      );
+    }
+    final first = _asObjectMap(candidates.first);
+    final content = _asObjectMap(first?['content']);
+    final parts = content?['parts'];
+    if (parts is! List || parts.isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.malformedResponse,
+        'Gemini response did not include content parts.',
+      );
+    }
+    final textParts = parts
+        .map(_asObjectMap)
+        .nonNulls
+        .map((part) => part['text'])
+        .whereType<String>()
+        .map((text) => text.trim())
+        .where((text) => text.isNotEmpty)
+        .toList(growable: false);
+    if (textParts.isEmpty) {
+      throw AiProviderException(
+        AiProviderFailureKind.malformedResponse,
+        'Gemini response did not include text content.',
+      );
+    }
+    return AiChatResponse(message: textParts.join('\n\n'));
   }
 
   Future<AiChatResponse> _sendAnthropic({
