@@ -1,6 +1,7 @@
 import 'package:ai_nutrition_companion/app/theme/app_theme.dart';
 import 'package:ai_nutrition_companion/domain/models/ai_chat.dart';
 import 'package:ai_nutrition_companion/domain/models/ai_settings.dart';
+import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_chat_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
@@ -76,6 +77,8 @@ const _openAiMissingTokenConfiguration = AiAdapterConfiguration(
 );
 
 void main() {
+  final testNow = DateTime(2026, 6, 29, 15, 30);
+
   testWidgets('renders empty chat state with today context and entry points', (
     tester,
   ) async {
@@ -86,6 +89,7 @@ void main() {
           nutritionRepository: InMemoryNutritionRepository(),
           chatRepository: InMemoryAiChatRepository(),
           configuration: _configuration,
+          now: testNow,
         ),
       ),
     );
@@ -100,6 +104,58 @@ void main() {
     expect(find.byIcon(Icons.mic_none), findsOneWidget);
   });
 
+  testWidgets('production default chat context uses current day', (
+    tester,
+  ) async {
+    final runtimeNow = DateTime.now();
+    final repository = InMemoryNutritionRepository(
+      seedMeals: [
+        Meal(
+          id: 'runtime-chat-meal',
+          name: 'Runtime chat breakfast',
+          eatenAt: runtimeNow,
+          source: NutritionSeedData.userSource,
+          items: const [
+            MealItem(
+              id: 'runtime-chat-oats',
+              food: FoodItem(
+                id: 'runtime-chat-oats-food',
+                name: 'Runtime chat oats',
+                servingDescription: '1 bowl',
+                nutritionPerServing: MacroTotals(
+                  calories: 350,
+                  proteinGrams: 24,
+                  carbsGrams: 45,
+                  fatGrams: 8,
+                ),
+                source: NutritionSeedData.userSource,
+              ),
+              servings: 1,
+              source: NutritionSeedData.userSource,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        AiChatScreen(
+          profile: _profile(),
+          nutritionRepository: repository,
+          chatRepository: InMemoryAiChatRepository(),
+          configuration: _configuration,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('Meals logged: Runtime chat breakfast'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('renders adapter error without dropping user prompt', (
     tester,
   ) async {
@@ -111,6 +167,7 @@ void main() {
           chatRepository: InMemoryAiChatRepository(),
           configuration: _configuration,
           adapter: const _FailingChatAdapter(),
+          now: testNow,
         ),
       ),
     );
@@ -142,6 +199,7 @@ void main() {
           adapter: const _ProviderFailureChatAdapter(
             AiProviderFailureKind.rateLimited,
           ),
+          now: testNow,
         ),
       ),
     );
@@ -174,6 +232,7 @@ void main() {
             configuration: _openAiMissingTokenConfiguration,
             readToken: () async => null,
           ),
+          now: testNow,
         ),
       ),
     );

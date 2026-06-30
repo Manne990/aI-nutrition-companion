@@ -57,7 +57,8 @@ class _ScriptedNutritionRepository extends InMemoryNutritionRepository {
 
 void main() {
   test('mock meal recognition returns deterministic AI estimate', () async {
-    const adapter = MockMealRecognitionAdapter();
+    final capturedAt = DateTime(2026, 6, 29, 17, 45);
+    final adapter = MockMealRecognitionAdapter(capturedAt: capturedAt);
 
     final estimate = await adapter.estimateMealFromPhoto(
       const PhotoMealCapture(
@@ -73,7 +74,23 @@ void main() {
       'Chicken grain bowl',
       'Creamy dressing',
     ]);
+    expect(estimate.estimatedAt, capturedAt);
+    expect(estimate.source.observedAt, capturedAt);
     expect(estimate.items.first.macroTotals?.calories, 610);
+  });
+
+  test('mock meal recognition defaults to runtime capture time', () async {
+    const adapter = MockMealRecognitionAdapter();
+
+    final estimate = await adapter.estimateMealFromPhoto(
+      const PhotoMealCapture(
+        path: '/tmp/grain-bowl.jpg',
+        mode: PhotoMealCaptureMode.camera,
+      ),
+    );
+
+    expect(estimate.estimatedAt, isNot(DateTime(2026, 6, 29, 17, 45)));
+    expect(estimate.source.observedAt, estimate.estimatedAt);
   });
 
   testWidgets('reviews corrects removes adds and saves a confirmed meal', (
@@ -238,6 +255,51 @@ void main() {
     expect(savedMeal.items.single.food.source.isVerified, isTrue);
     expect(savedMeal.knownMacroTotals.proteinGrams, 18);
     expect(find.text('Packaged food saved to today.'), findsOneWidget);
+  });
+
+  testWidgets('packaged lookup save defaults to runtime time', (tester) async {
+    final repository = _ScriptedNutritionRepository(
+      lookup: (query) async {
+        return NutritionLookupResult(
+          query: query,
+          status: NutritionLookupStatus.verified,
+          providerName: 'open-food-facts',
+          food: const FoodItem(
+            id: 'runtime-packaged',
+            name: 'Runtime packaged food',
+            servingDescription: '1 package',
+            nutritionPerServing: MacroTotals(
+              calories: 180,
+              proteinGrams: 18,
+              carbsGrams: 20,
+              fatGrams: 4,
+            ),
+            source: SourceMetadata(
+              source: NutritionSource.databaseVerified,
+              label: 'Open Food Facts',
+              provider: 'open-food-facts',
+            ),
+          ),
+          message: 'Matched packaged product nutrition by barcode.',
+        );
+      },
+    );
+
+    await tester.pumpWidget(
+      _wrap(PhotoMealLoggingCard(repository: repository)),
+    );
+
+    await tester.enterText(_textFieldWithLabel('Barcode'), '737628064502');
+    await tester.tap(find.text('Look up package'));
+    await tester.pumpAndSettle();
+
+    await _ensureVisible(tester, find.text('Save packaged food'));
+    await tester.tap(find.text('Save packaged food'));
+    await tester.pumpAndSettle();
+
+    final savedMeal = repository.meals().last;
+    expect(savedMeal.name, 'Runtime packaged food');
+    expect(savedMeal.eatenAt, isNot(DateTime(2026, 6, 29, 17, 55)));
   });
 
   testWidgets(

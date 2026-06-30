@@ -29,6 +29,7 @@ class AppShell extends StatefulWidget {
     required this.aiChatRepository,
     this.nutritionRepository,
     this.foodDataCentralSearchClient,
+    this.now,
   });
 
   final OnboardingRepository onboardingRepository;
@@ -38,6 +39,7 @@ class AppShell extends StatefulWidget {
   final AiChatRepository aiChatRepository;
   final NutritionRepository? nutritionRepository;
   final FoodDataCentralSearchClient? foodDataCentralSearchClient;
+  final DateTime? now;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -154,6 +156,7 @@ class _AppShellState extends State<AppShell> {
                     mealRecognitionAdapter: MockMealRecognitionAdapter(
                       configuration: aiConfiguration,
                     ),
+                    now: widget.now,
                     healthSignals: healthState.isConnected
                         ? healthState.signals
                         : null,

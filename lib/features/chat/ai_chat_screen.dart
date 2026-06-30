@@ -160,7 +160,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   AiChatContext get _context {
-    final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
+    final now = widget.now ?? DateTime.now();
     return AiChatContext(
       preferences: widget.profile.toUserPreferences(),
       summary: widget.nutritionRepository.dailySummary(now),

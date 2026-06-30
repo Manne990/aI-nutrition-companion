@@ -75,6 +75,7 @@ Future<void> _pumpApp(
   NutritionRepository? nutritionRepository,
   FoodDataCentralSearchClient? foodDataCentralSearchClient,
   bool useDefaultNutritionRepository = false,
+  DateTime? now,
 }) async {
   await tester.pumpWidget(
     AiNutritionCompanionApp(
@@ -89,6 +90,7 @@ Future<void> _pumpApp(
           ? nutritionRepository
           : nutritionRepository ?? InMemoryNutritionRepository(),
       foodDataCentralSearchClient: foodDataCentralSearchClient,
+      now: now ?? DateTime(2026, 6, 29, 15, 30),
     ),
   );
   await tester.pumpAndSettle();

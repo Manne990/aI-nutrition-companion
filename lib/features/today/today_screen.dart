@@ -97,7 +97,8 @@ class _TodayScreenState extends State<TodayScreen> {
     if (oldWidget.adapter != widget.adapter ||
         oldWidget.profile != widget.profile ||
         oldWidget.healthSignals != widget.healthSignals ||
-        oldWidget.repository != widget.repository) {
+        oldWidget.repository != widget.repository ||
+        oldWidget.now != widget.now) {
       _suggestions = _loadSuggestions();
       _selectedSuggestionIndex = 0;
       _lastAction = _SuggestionAction.none;
@@ -118,7 +119,7 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   List<MealSuggestion> _loadSuggestions() {
-    final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
+    final now = _now();
     final baseSuggestions = widget.adapter.mealSuggestions(
       preferences: widget.profile.toUserPreferences(),
       healthSignals: widget.healthSignals,
@@ -133,7 +134,7 @@ class _TodayScreenState extends State<TodayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
+    final now = _now();
     final summary = _repository.dailySummary(now);
     final suggestion = _activeSuggestion;
     final quickLogSuggestions = _repository.quickLogSuggestions(now);
@@ -208,7 +209,7 @@ class _TodayScreenState extends State<TodayScreen> {
           repository: _repository,
           photoSource: widget.photoMealSource,
           recognitionAdapter: widget.mealRecognitionAdapter,
-          now: now,
+          now: widget.now,
           onMealSaved: (_) => setState(() {
             _suggestions = _loadSuggestions();
             _aiChoiceMessage = 'Meal saved. Today totals were updated.';
@@ -217,8 +218,7 @@ class _TodayScreenState extends State<TodayScreen> {
         const SizedBox(height: AppSpacing.md),
         _QuickLogCard(
           suggestions: quickLogSuggestions,
-          onConfirm: (quickLogSuggestion) =>
-              _confirmQuickLog(quickLogSuggestion, now),
+          onConfirm: _confirmQuickLog,
         ),
         const SizedBox(height: AppSpacing.md),
         AiMessageBubble(
@@ -261,6 +261,8 @@ class _TodayScreenState extends State<TodayScreen> {
     return _suggestions[_selectedSuggestionIndex % _suggestions.length];
   }
 
+  DateTime _now() => widget.now ?? DateTime.now();
+
   void _acceptSuggestion() {
     setState(() {
       _lastAction = _SuggestionAction.accepted;
@@ -297,7 +299,7 @@ class _TodayScreenState extends State<TodayScreen> {
       return;
     }
 
-    final now = widget.now ?? DateTime(2026, 6, 29, 15, 30);
+    final now = _now();
     _repository.saveWeightEntry(
       WeightEntry(
         id: 'weight-${now.millisecondsSinceEpoch}',
@@ -313,7 +315,8 @@ class _TodayScreenState extends State<TodayScreen> {
     });
   }
 
-  void _confirmQuickLog(QuickLogSuggestion suggestion, DateTime now) {
+  void _confirmQuickLog(QuickLogSuggestion suggestion) {
+    final now = _now();
     _repository.confirmQuickLogSuggestion(suggestion, eatenAt: now);
     setState(() {
       _suggestions = _loadSuggestions();

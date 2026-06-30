@@ -20,6 +20,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
     this.aiChatRepository,
     this.nutritionRepository,
     this.foodDataCentralSearchClient,
+    this.now,
   });
 
   final OnboardingRepository? onboardingRepository;
@@ -29,6 +30,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
   final AiChatRepository? aiChatRepository;
   final NutritionRepository? nutritionRepository;
   final FoodDataCentralSearchClient? foodDataCentralSearchClient;
+  final DateTime? now;
 
   @override
   State<AiNutritionCompanionApp> createState() =>
@@ -90,6 +92,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
               aiChatRepository: repositories.aiChatRepository,
               nutritionRepository: repositories.nutritionRepository,
               foodDataCentralSearchClient: widget.foodDataCentralSearchClient,
+              now: widget.now,
             );
           }
           return const Scaffold(
