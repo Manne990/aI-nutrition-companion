@@ -38,6 +38,7 @@ void main() {
       authState: const AuthAccountState(
         status: AuthConnectionStatus.providerUnavailable,
         provider: AuthProvider.supabase,
+        userLabel: 'Local Person',
       ),
       healthState: const HealthConnectionState(
         status: HealthConnectionStatus.connected,
@@ -55,7 +56,9 @@ void main() {
     expect(export, contains('- Mode: OpenAI ready'));
     expect(export, contains('- AI token: saved (redacted)'));
     expect(export, contains('- Provider: Supabase Auth'));
+    expect(export, contains('- User label: Local Person'));
     expect(export, contains('- Enabled data types: Activity, Sleep'));
+    expect(export, contains('- Backup preference: Local only'));
     expect(export, contains('- Dietary preference count: 2'));
     expect(export, contains('test secure token storage [redacted]'));
     expect(export, isNot(contains('sk-live-secret')));

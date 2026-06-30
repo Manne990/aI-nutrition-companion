@@ -34,7 +34,7 @@ class TodayScreen extends StatefulWidget {
       tokenState: AiTokenState(
         hasToken: false,
         isSecureStorage: true,
-        storageLabel: 'mock local storage',
+        storageLabel: 'local session storage',
       ),
     ),
     this.aiChatAdapter = const MockAiChatAdapter(),

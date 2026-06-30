@@ -48,7 +48,7 @@ class DesignSystemDemo extends StatelessWidget {
                   metrics: [
                     AppMetricData(label: 'Protein', value: '32g'),
                     AppMetricData(label: 'Energy', value: '410 kcal'),
-                    AppMetricData(label: 'Source', value: 'Mock AI'),
+                    AppMetricData(label: 'Source', value: 'AI estimate'),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),

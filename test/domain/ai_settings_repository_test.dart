@@ -173,7 +173,7 @@ void main() {
     },
   );
 
-  test('real provider selection does not silently become mock mode', () async {
+  test('real provider selection does not silently change provider', () async {
     const configuration = AiAdapterConfiguration(
       settings: AiProviderSettings(
         provider: AiProvider.openai,

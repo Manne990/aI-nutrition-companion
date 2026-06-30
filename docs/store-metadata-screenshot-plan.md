@@ -13,18 +13,19 @@ production values before public testing or production submission.
 - App name: `AI Nutrition Companion`.
 - Version in `pubspec.yaml`: `1.0.0+1`.
 - Platforms: iOS and Android.
-- Default mode: local mock companion, mock AI responses, deterministic mock
-  meal recognition, local nutrition data, and local-first app state.
+- Default mode: local account gate, OpenAI provider selection pending token,
+  deterministic internal estimators for local development, local nutrition
+  data, and local-first app state.
 - Backend: no custom backend exists in this repository.
 - Accounts: local account gate only; no remote account provider or cloud sync.
-- Nutrition lookup: deterministic local/mock defaults unless a user-provided
-  or runtime-injected provider key is available.
+- Nutrition lookup: deterministic local fallback plus configured FoodData
+  Central lookup when a build/app runtime supplies a provider key.
 - AI provider tokens: user-provided tokens are optional and must not be
   committed, bundled, or included in diagnostics or screenshots.
-- Health data: mock health scaffolding only; no HealthKit entitlement, Android
+- Health data: health scaffolding only; no HealthKit entitlement, Android
   Health Connect permission, or native health bridge is enabled.
 - Photos: meal photo flows exist for user-selected logging. The current local
-  default uses deterministic mock recognition.
+  default uses deterministic internal recognition.
 - Diagnostics, analytics, crash reporting, ads, billing, and automatic support
   upload are not configured.
 
@@ -52,7 +53,7 @@ Keep these explicit until final production assets exist:
 | Primary category | Health & Fitness |
 | Secondary category | Food & Drink |
 | Promotional text | Practical meal suggestions, quick logging, and AI companion prompts for deciding what to eat next. |
-| Short description for internal review | Local-first nutrition companion with mock AI defaults and optional user-configured providers. |
+| Short description for internal review | Local-first nutrition companion with account-gated setup and optional user-configured AI providers. |
 | Keywords | nutrition,meal planner,food log,protein,wellness,AI companion,healthy eating |
 | Support URL | TODO before production submission. |
 | Marketing URL | TODO optional before production submission. |
@@ -69,8 +70,8 @@ that explain what would help your current day.
 
 V1 focuses on local-first meal guidance. You can log meals, review nutrition
 estimates, reuse common meals from Kitchen, and manage goals, preferences,
-privacy, health, and AI provider settings from Me. Mock AI and local fallback
-data are the default development and testing modes.
+privacy, health, and AI provider settings from Me. Local fallback data and
+deterministic internal estimators keep development and testing reproducible.
 
 The app provides practical nutrition support, not medical diagnosis,
 treatment, or emergency advice. If real provider mode is enabled in a future
@@ -90,7 +91,7 @@ provider's terms.
 | Website | TODO optional marketing URL. |
 | Privacy policy URL | TODO before production submission. |
 | Data safety basis | Complete from final data inventory. Current repo default is local-first with no analytics, ads, crash SDK, backend, or automatic upload. |
-| App access instructions | No account is required for current V1 defaults. If a future account gate is added, provide demo access or review credentials. |
+| App access instructions | A local account is required. Provide demo access steps or review credentials before store submission. |
 
 ### Google Play Full Description Draft
 
@@ -102,10 +103,11 @@ start a quick log, or ask the companion a practical question. Use Kitchen to
 reuse common meals and ingredients. Use Me to manage goals, preferences, health
 connection state, privacy boundaries, and AI provider settings.
 
-The current V1 app keeps mock AI and local fallback nutrition behavior as the
-default. No custom backend, analytics SDK, ads SDK, billing flow, or automatic
-support upload is configured in this repository. User-provided provider tokens
-must stay user-controlled and must not be packaged in the app.
+The current V1 app keeps local fallback nutrition behavior and deterministic
+internal estimators for development. No custom backend, analytics SDK, ads SDK,
+billing flow, or automatic support upload is configured in this repository.
+User-provided provider tokens must stay user-controlled and must not be
+packaged in the app.
 
 AI Nutrition Companion gives practical nutrition guidance from the information
 you provide. It does not diagnose, treat, or replace advice from a qualified
@@ -123,7 +125,7 @@ layout differ.
 | 1 | Today decision hub | Launch app, complete or use seeded onboarding, land on `Today`. | Lead with the core promise: what to eat next. |
 | 2 | Suggested next meal with source cues | Today screen, scroll to the suggestion and nutrition source chips. | Show companion guidance, rationale, and provenance. |
 | 3 | Daily overview and quick log | Today screen, show nutrition progress and Quick Log area. | Show low-friction tracking as decision support. |
-| 4 | Photo meal logging review or fallback | From Today, open meal photo logging with mock recognition or permission fallback. | Show user-controlled photo logging and confirmation. |
+| 4 | Photo meal logging review or fallback | From Today, open meal photo logging with internal recognition or permission fallback. | Show user-controlled photo logging and confirmation. |
 | 5 | AI Companion chat | From Today chat entry, open `AI Companion` and use a suggested prompt. | Show practical AI assistance with current-day context. |
 | 6 | Kitchen reuse surface | Tap `Kitchen`. | Show favorite meals, ingredient availability, and habit suggestions. |
 | 7 | Me privacy and settings hub | Tap `Me`; include AI provider, credentials, health, and privacy cards when visible. | Show user control, local-first boundaries, and settings. |
@@ -133,7 +135,7 @@ layout differ.
 
 - Avoid screenshots containing real API tokens, signing details, personal
   email addresses, private meal photos, or health records.
-- Use deterministic mock data or clearly non-sensitive seed data.
+- Use deterministic internal data or clearly non-sensitive seed data.
 - If real provider configuration is demonstrated, use a non-secret placeholder
   state, not a real token.
 - Keep status bars and system time consistent across each platform set.
@@ -150,9 +152,10 @@ AI Nutrition Companion V1 is a local-first nutrition companion for practical
 meal guidance. The app helps users decide what to eat next, log meals, review
 nutrition estimates, and manage goals/preferences.
 
-Mock AI and deterministic local nutrition behavior are enabled by default for
-the current V1 build. No custom backend, cloud account, analytics SDK, ads SDK,
-billing flow, or automatic diagnostics upload is configured in this repository.
+Deterministic internal estimators and local nutrition behavior are available
+for the current V1 build. No custom backend, cloud account, analytics SDK, ads
+SDK, billing flow, or automatic diagnostics upload is configured in this
+repository.
 
 If provider settings are enabled, the user must provide and control their own
 provider credentials. Real production API keys are not bundled in the app. Do
@@ -162,7 +165,7 @@ Meal photo logging is initiated only by the user. The app should request camera
 or photo access only when the user starts a photo logging action, and it should
 offer a local fallback or explanation if access is denied or unavailable.
 
-Health connection behavior is currently mock/scaffolded only. The repository
+Health connection behavior is currently scaffolded only. The repository
 does not enable HealthKit entitlements, Android Health Connect permissions, or
 native health data access yet.
 
