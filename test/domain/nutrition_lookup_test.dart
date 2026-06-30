@@ -236,6 +236,122 @@ void main() {
       expect(result.food?.nutritionPerServing?.fatGrams, 13.4);
     });
 
+    test(
+      'FoodData Central HTTP client builds search request and parses JSON',
+      () async {
+        final transport = _FakeFoodDataCentralTransport(
+          response: const FoodDataCentralTransportResponse(
+            statusCode: 200,
+            body: '''
+{
+  "foods": [
+    {
+      "fdcId": 175167,
+      "description": "Salmon, raw",
+      "servingSize": 100,
+      "servingSizeUnit": "g",
+      "foodNutrients": [
+        {"nutrientId": 1008, "nutrientName": "Energy", "value": 208},
+        {"nutrientId": 1003, "nutrientName": "Protein", "value": 20.4},
+        {"nutrientId": 1005, "nutrientName": "Carbohydrate", "value": 0},
+        {"nutrientId": 1004, "nutrientName": "Total lipid (fat)", "value": 13.4}
+      ]
+    }
+  ]
+}
+''',
+          ),
+        );
+        final client = FoodDataCentralHttpSearchClient(transport: transport);
+
+        final response = await client.searchFoods(
+          query: 'salmon',
+          apiKey: 'user-owned-test-key',
+        );
+
+        expect(transport.lastUri?.scheme, 'https');
+        expect(transport.lastUri?.host, 'api.nal.usda.gov');
+        expect(transport.lastUri?.path, '/fdc/v1/foods/search');
+        expect(transport.lastUri?.queryParameters['query'], 'salmon');
+        expect(
+          transport.lastUri?.queryParameters['api_key'],
+          'user-owned-test-key',
+        );
+        expect(transport.lastUri?.queryParameters['pageSize'], '5');
+        expect(transport.lastHeaders['accept'], 'application/json');
+        expect(
+          transport.lastHeaders['user-agent'],
+          contains('AI Nutrition Companion'),
+        );
+        expect(response.foods.single.description, 'Salmon, raw');
+        expect(response.firstUsableFood()?.id, 'fdc-175167');
+      },
+    );
+
+    test(
+      'FoodData Central HTTP client maps status and malformed responses',
+      () async {
+        final rateLimit = FoodDataCentralHttpSearchClient(
+          transport: _FakeFoodDataCentralTransport(
+            response: const FoodDataCentralTransportResponse(
+              statusCode: 429,
+              body: '{}',
+            ),
+          ),
+        );
+        final timeout = FoodDataCentralHttpSearchClient(
+          transport: _FakeFoodDataCentralTransport(
+            response: const FoodDataCentralTransportResponse(
+              statusCode: 504,
+              body: '{}',
+            ),
+          ),
+        );
+        final serverError = FoodDataCentralHttpSearchClient(
+          transport: _FakeFoodDataCentralTransport(
+            response: const FoodDataCentralTransportResponse(
+              statusCode: 500,
+              body: '{}',
+            ),
+          ),
+        );
+        final malformed = FoodDataCentralHttpSearchClient(
+          transport: _FakeFoodDataCentralTransport(
+            response: const FoodDataCentralTransportResponse(
+              statusCode: 200,
+              body: '[',
+            ),
+          ),
+        );
+
+        Future<FoodDataCentralSearchResponse> search(
+          FoodDataCentralSearchClient client,
+        ) {
+          return client.searchFoods(
+            query: 'salmon',
+            apiKey: 'user-owned-test-key',
+          );
+        }
+
+        await expectLater(
+          search(rateLimit),
+          throwsA(isA<FoodDataCentralRateLimitException>()),
+        );
+        await expectLater(search(timeout), throwsA(isA<TimeoutException>()));
+        await expectLater(
+          search(serverError),
+          throwsA(
+            isA<FoodDataCentralHttpException>().having(
+              (error) => error.statusCode,
+              'statusCode',
+              500,
+            ),
+          ),
+        );
+        await expectLater(search(malformed), throwsA(isA<FormatException>()));
+      },
+    );
+
     test('FoodData Central adapter reports no search results', () async {
       final provider = FoodDataCentralNutritionProvider(
         apiKey: 'user-owned-test-key',
@@ -712,6 +828,25 @@ class _FakeFoodDataCentralSearchClient implements FoodDataCentralSearchClient {
       throw failure;
     }
     return response ?? const FoodDataCentralSearchResponse(foods: []);
+  }
+}
+
+class _FakeFoodDataCentralTransport implements FoodDataCentralTransport {
+  _FakeFoodDataCentralTransport({required this.response});
+
+  final FoodDataCentralTransportResponse response;
+
+  Uri? lastUri;
+  Map<String, String> lastHeaders = const {};
+
+  @override
+  Future<FoodDataCentralTransportResponse> get(
+    Uri uri,
+    Map<String, String> headers,
+  ) async {
+    lastUri = uri;
+    lastHeaders = Map.unmodifiable(headers);
+    return response;
   }
 }
 

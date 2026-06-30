@@ -12,6 +12,103 @@ abstract interface class FoodDataCentralSearchClient {
   });
 }
 
+abstract interface class FoodDataCentralTransport {
+  Future<FoodDataCentralTransportResponse> get(
+    Uri uri,
+    Map<String, String> headers,
+  );
+}
+
+class FoodDataCentralTransportResponse {
+  const FoodDataCentralTransportResponse({
+    required this.statusCode,
+    required this.body,
+  });
+
+  final int statusCode;
+  final String body;
+}
+
+class FoodDataCentralHttpTransport implements FoodDataCentralTransport {
+  const FoodDataCentralHttpTransport();
+
+  @override
+  Future<FoodDataCentralTransportResponse> get(
+    Uri uri,
+    Map<String, String> headers,
+  ) async {
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(uri);
+      headers.forEach(request.headers.set);
+      final response = await request.close();
+      final body = await utf8.decoder.bind(response).join();
+      return FoodDataCentralTransportResponse(
+        statusCode: response.statusCode,
+        body: body,
+      );
+    } finally {
+      client.close(force: true);
+    }
+  }
+}
+
+class FoodDataCentralHttpSearchClient implements FoodDataCentralSearchClient {
+  const FoodDataCentralHttpSearchClient({
+    this.transport,
+    this.baseSearchUrl = 'https://api.nal.usda.gov/fdc/v1/foods/search',
+    this.userAgent = OpenFoodFactsNutritionProvider.defaultUserAgent,
+    this.pageSize = 5,
+  });
+
+  final FoodDataCentralTransport? transport;
+  final String baseSearchUrl;
+  final String userAgent;
+  final int pageSize;
+
+  @override
+  Future<FoodDataCentralSearchResponse> searchFoods({
+    required String query,
+    required String apiKey,
+  }) async {
+    final uri = Uri.parse(baseSearchUrl).replace(
+      queryParameters: {
+        'api_key': apiKey,
+        'query': query,
+        'pageSize': pageSize.toString(),
+      },
+    );
+    final response = await (transport ?? const FoodDataCentralHttpTransport())
+        .get(uri, {
+          HttpHeaders.userAgentHeader: userAgent,
+          HttpHeaders.acceptHeader: 'application/json',
+        });
+
+    if (response.statusCode == 429) {
+      throw const FoodDataCentralRateLimitException();
+    }
+    if (response.statusCode == 408 || response.statusCode == 504) {
+      throw TimeoutException(
+        'FoodData Central returned ${response.statusCode}',
+      );
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw FoodDataCentralHttpException(response.statusCode);
+    }
+
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } on Object {
+      throw const FormatException('FoodData Central returned malformed JSON');
+    }
+    if (decoded is! Map<String, Object?>) {
+      throw const FormatException('FoodData Central returned wrong JSON shape');
+    }
+    return FoodDataCentralSearchResponse.fromJson(decoded);
+  }
+}
+
 class FoodDataCentralSearchResponse {
   const FoodDataCentralSearchResponse({required this.foods});
 
@@ -619,6 +716,12 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
 
 class FoodDataCentralRateLimitException implements Exception {
   const FoodDataCentralRateLimitException();
+}
+
+class FoodDataCentralHttpException implements Exception {
+  const FoodDataCentralHttpException(this.statusCode);
+
+  final int statusCode;
 }
 
 Map<String, Object?>? _asObjectMap(Object? value) {

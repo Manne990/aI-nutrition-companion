@@ -8,6 +8,7 @@ import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/nutrition_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
+import '../services/adapters/nutrition_lookup_adapters.dart';
 
 class AiNutritionCompanionApp extends StatefulWidget {
   const AiNutritionCompanionApp({
@@ -18,6 +19,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
     this.healthRepository,
     this.aiChatRepository,
     this.nutritionRepository,
+    this.foodDataCentralSearchClient,
   });
 
   final OnboardingRepository? onboardingRepository;
@@ -26,6 +28,7 @@ class AiNutritionCompanionApp extends StatefulWidget {
   final HealthRepository? healthRepository;
   final AiChatRepository? aiChatRepository;
   final NutritionRepository? nutritionRepository;
+  final FoodDataCentralSearchClient? foodDataCentralSearchClient;
 
   @override
   State<AiNutritionCompanionApp> createState() =>
@@ -86,6 +89,7 @@ class _AiNutritionCompanionAppState extends State<AiNutritionCompanionApp> {
               healthRepository: repositories.healthRepository,
               aiChatRepository: repositories.aiChatRepository,
               nutritionRepository: repositories.nutritionRepository,
+              foodDataCentralSearchClient: widget.foodDataCentralSearchClient,
             );
           }
           return const Scaffold(

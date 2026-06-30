@@ -7,6 +7,7 @@ import 'package:ai_nutrition_companion/domain/repositories/auth_repository.dart'
 import 'package:ai_nutrition_companion/domain/repositories/health_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/nutrition_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/onboarding_repository.dart';
+import 'package:ai_nutrition_companion/services/adapters/nutrition_lookup_adapters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,26 +25,79 @@ OnboardingProfile _profile() {
   );
 }
 
+Future<void> _searchGenericFood(WidgetTester tester, String foodName) async {
+  await _scrollUntilVisible(tester, _textFieldWithLabel('Food name'));
+  await tester.enterText(_textFieldWithLabel('Food name'), foodName);
+  await _scrollUntilVisible(tester, find.text('Search generic food'));
+  await tester.tap(find.text('Search generic food'));
+  await tester.pumpAndSettle();
+}
+
+class _RuntimeFoodDataCentralSearchClient
+    implements FoodDataCentralSearchClient {
+  final apiKeys = <String>[];
+  final queries = <String>[];
+
+  @override
+  Future<FoodDataCentralSearchResponse> searchFoods({
+    required String query,
+    required String apiKey,
+  }) async {
+    apiKeys.add(apiKey);
+    queries.add(query);
+    return FoodDataCentralSearchResponse.fromJson({
+      'foods': [
+        {
+          'fdcId': '${apiKeys.length}${query.length}',
+          'description': '$query verified',
+          'servingSize': 100,
+          'servingSizeUnit': 'g',
+          'foodNutrients': [
+            {'nutrientId': 1008, 'nutrientName': 'Energy', 'value': 180},
+            {'nutrientId': 1003, 'nutrientName': 'Protein', 'value': 20},
+            {'nutrientId': 1005, 'nutrientName': 'Carbohydrate', 'value': 3},
+            {
+              'nutrientId': 1004,
+              'nutrientName': 'Total lipid (fat)',
+              'value': 9,
+            },
+          ],
+        },
+      ],
+    });
+  }
+}
+
 Future<void> _pumpApp(
   WidgetTester tester, {
   InMemoryOnboardingRepository? repository,
+  AiSettingsRepository? aiSettingsRepository,
   NutritionRepository? nutritionRepository,
+  FoodDataCentralSearchClient? foodDataCentralSearchClient,
   bool useDefaultNutritionRepository = false,
 }) async {
   await tester.pumpWidget(
     AiNutritionCompanionApp(
       onboardingRepository:
           repository ?? InMemoryOnboardingRepository(_profile()),
-      aiSettingsRepository: InMemoryAiSettingsRepository(),
+      aiSettingsRepository:
+          aiSettingsRepository ?? InMemoryAiSettingsRepository(),
       authRepository: InMemoryAuthRepository(),
       healthRepository: InMemoryHealthRepository(),
       aiChatRepository: InMemoryAiChatRepository(),
       nutritionRepository: useDefaultNutritionRepository
           ? nutritionRepository
           : nutritionRepository ?? InMemoryNutritionRepository(),
+      foodDataCentralSearchClient: foodDataCentralSearchClient,
     ),
   );
   await tester.pumpAndSettle();
+}
+
+Finder _textFieldWithLabel(String label) {
+  return find.byWidgetPredicate(
+    (widget) => widget is TextField && widget.decoration?.labelText == label,
+  );
 }
 
 Future<void> _scrollUntilVisible(WidgetTester tester, Finder finder) async {
@@ -164,6 +218,99 @@ void main() {
     expect(find.text('Favorite meals'), findsOneWidget);
     expect(find.text('Persisted banana snack'), findsOneWidget);
   });
+
+  testWidgets(
+    'FoodData Central key save change and delete refresh runtime lookup',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final aiSettingsRepository = InMemoryAiSettingsRepository();
+      final foodDataCentralClient = _RuntimeFoodDataCentralSearchClient();
+
+      await _pumpApp(
+        tester,
+        aiSettingsRepository: aiSettingsRepository,
+        useDefaultNutritionRepository: true,
+        foodDataCentralSearchClient: foodDataCentralClient,
+      );
+
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      await _scrollUntilVisible(
+        tester,
+        _textFieldWithLabel('FoodData Central API key'),
+      );
+      await tester.enterText(
+        _textFieldWithLabel('FoodData Central API key'),
+        'first-user-key',
+      );
+      await _scrollUntilVisible(tester, find.text('Save FoodData Central key'));
+      await tester.tap(find.text('Save FoodData Central key'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.wb_sunny_outlined));
+      await tester.pumpAndSettle();
+      await _searchGenericFood(tester, 'salmon');
+
+      expect(foodDataCentralClient.apiKeys, ['first-user-key']);
+      expect(find.text('salmon verified'), findsOneWidget);
+      expect(
+        find.text('Matched FoodData Central search nutrition.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      await _scrollUntilVisible(
+        tester,
+        _textFieldWithLabel('FoodData Central API key'),
+      );
+      await tester.enterText(
+        _textFieldWithLabel('FoodData Central API key'),
+        'second-user-key',
+      );
+      await _scrollUntilVisible(
+        tester,
+        find.text('Update FoodData Central key'),
+      );
+      await tester.tap(find.text('Update FoodData Central key'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.wb_sunny_outlined));
+      await tester.pumpAndSettle();
+      await _searchGenericFood(tester, 'oats');
+
+      expect(foodDataCentralClient.apiKeys, [
+        'first-user-key',
+        'second-user-key',
+      ]);
+      expect(find.text('oats verified'), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+      await _scrollUntilVisible(
+        tester,
+        find.text('Delete FoodData Central key'),
+      );
+      await tester.tap(find.text('Delete FoodData Central key'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.wb_sunny_outlined));
+      await tester.pumpAndSettle();
+      await _searchGenericFood(tester, 'avocado');
+
+      expect(foodDataCentralClient.apiKeys, [
+        'first-user-key',
+        'second-user-key',
+      ]);
+      expect(find.text('FoodData Central key needed'), findsOneWidget);
+      expect(
+        find.text(
+          'Add a FoodData Central API key to use generic food search. No app-owned key is bundled.',
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('first-run user can skip optional steps and complete consent', (
     tester,
