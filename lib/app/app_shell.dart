@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../domain/models/ai_settings.dart';
+import '../domain/models/auth.dart';
 import '../domain/models/health.dart';
 import '../domain/models/onboarding.dart';
 import '../domain/repositories/ai_chat_repository.dart';
 import '../domain/repositories/ai_settings_repository.dart';
+import '../domain/repositories/auth_repository.dart';
 import '../domain/repositories/health_repository.dart';
 import '../domain/repositories/nutrition_repository.dart';
 import '../domain/repositories/onboarding_repository.dart';
@@ -20,6 +22,7 @@ class AppShell extends StatefulWidget {
     super.key,
     required this.onboardingRepository,
     required this.aiSettingsRepository,
+    required this.authRepository,
     required this.healthRepository,
     required this.aiChatRepository,
     this.nutritionRepository,
@@ -27,6 +30,7 @@ class AppShell extends StatefulWidget {
 
   final OnboardingRepository onboardingRepository;
   final AiSettingsRepository aiSettingsRepository;
+  final AuthRepository authRepository;
   final HealthRepository healthRepository;
   final AiChatRepository aiChatRepository;
   final NutritionRepository? nutritionRepository;
@@ -39,8 +43,15 @@ class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
   late Future<OnboardingProfile?> _profileFuture;
   late Future<AiAdapterConfiguration> _aiConfigurationFuture;
+  late Future<AuthAccountState> _authStateFuture;
   late Future<HealthConnectionState> _healthStateFuture;
-  late Future<({AiAdapterConfiguration ai, HealthConnectionState health})>
+  late Future<
+    ({
+      AiAdapterConfiguration ai,
+      AuthAccountState auth,
+      HealthConnectionState health,
+    })
+  >
   _runtimeStateFuture;
   late Future<NutritionRepository> _nutritionRepositoryFuture;
   OnboardingProfile? _profile;
@@ -70,6 +81,7 @@ class _AppShellState extends State<AppShell> {
     _profileFuture = widget.onboardingRepository.loadProfile();
     _aiConfigurationFuture = widget.aiSettingsRepository
         .loadAdapterConfiguration();
+    _authStateFuture = widget.authRepository.loadState();
     _healthStateFuture = widget.healthRepository.loadState();
     _runtimeStateFuture = _loadRuntimeState();
   }
@@ -94,7 +106,11 @@ class _AppShellState extends State<AppShell> {
         _ensureNutritionRepository(profile);
 
         return FutureBuilder<
-          ({AiAdapterConfiguration ai, HealthConnectionState health})
+          ({
+            AiAdapterConfiguration ai,
+            AuthAccountState auth,
+            HealthConnectionState health,
+          })
         >(
           future: _runtimeStateFuture,
           builder: (context, runtimeSnapshot) {
@@ -107,6 +123,7 @@ class _AppShellState extends State<AppShell> {
             }
 
             final aiConfiguration = runtimeSnapshot.requireData.ai;
+            final authState = runtimeSnapshot.requireData.auth;
             final healthState = runtimeSnapshot.requireData.health;
             return FutureBuilder<NutritionRepository>(
               future: _nutritionRepositoryFuture,
@@ -140,9 +157,12 @@ class _AppShellState extends State<AppShell> {
                   MeScreen(
                     profile: profile,
                     aiSettingsRepository: widget.aiSettingsRepository,
+                    authRepository: widget.authRepository,
+                    authState: authState,
                     healthRepository: widget.healthRepository,
                     healthState: healthState,
                     onAiSettingsChanged: _reloadAiConfiguration,
+                    onAuthStateChanged: _reloadAuthState,
                     onHealthStateChanged: _reloadHealthState,
                     onResetOnboarding: _resetOnboarding,
                   ),
@@ -199,6 +219,13 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
+  Future<void> _reloadAuthState() async {
+    setState(() {
+      _authStateFuture = widget.authRepository.loadState();
+      _runtimeStateFuture = _loadRuntimeState();
+    });
+  }
+
   Future<void> _reloadHealthState() async {
     setState(() {
       _healthStateFuture = widget.healthRepository.loadState();
@@ -206,9 +233,19 @@ class _AppShellState extends State<AppShell> {
     });
   }
 
-  Future<({AiAdapterConfiguration ai, HealthConnectionState health})>
+  Future<
+    ({
+      AiAdapterConfiguration ai,
+      AuthAccountState auth,
+      HealthConnectionState health,
+    })
+  >
   _loadRuntimeState() async {
-    return (ai: await _aiConfigurationFuture, health: await _healthStateFuture);
+    return (
+      ai: await _aiConfigurationFuture,
+      auth: await _authStateFuture,
+      health: await _healthStateFuture,
+    );
   }
 
   void _ensureNutritionRepository(OnboardingProfile profile) {

@@ -1,8 +1,10 @@
 import 'package:ai_nutrition_companion/app/theme/app_theme.dart';
 import 'package:ai_nutrition_companion/domain/models/ai_settings.dart';
+import 'package:ai_nutrition_companion/domain/models/auth.dart';
 import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_settings_repository.dart';
+import 'package:ai_nutrition_companion/domain/repositories/auth_repository.dart';
 import 'package:ai_nutrition_companion/domain/repositories/health_repository.dart';
 import 'package:ai_nutrition_companion/features/me/me_screen.dart';
 import 'package:flutter/material.dart';
@@ -31,9 +33,13 @@ Widget _wrap(Widget child) {
 Future<void> _pumpMe(
   WidgetTester tester,
   InMemoryAiSettingsRepository aiRepository, {
+  InMemoryAuthRepository? authRepository,
+  AuthAccountState authState = AuthAccountState.signedOut,
   InMemoryHealthRepository? healthRepository,
   HealthConnectionState healthState = HealthConnectionState.disconnected,
 }) async {
+  final effectiveAuthRepository =
+      authRepository ?? InMemoryAuthRepository(initialState: authState);
   final effectiveHealthRepository =
       healthRepository ?? InMemoryHealthRepository(initialState: healthState);
   await tester.pumpWidget(
@@ -41,9 +47,12 @@ Future<void> _pumpMe(
       MeScreen(
         profile: _profile(),
         aiSettingsRepository: aiRepository,
+        authRepository: effectiveAuthRepository,
+        authState: authState,
         healthRepository: effectiveHealthRepository,
         healthState: healthState,
         onAiSettingsChanged: () async {},
+        onAuthStateChanged: () async {},
         onHealthStateChanged: () async {},
         onResetOnboarding: () async {},
       ),
@@ -88,6 +97,65 @@ void main() {
       find.textContaining('Mock AI is the default for tests and local CI'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('account state starts signed out with mock auth boundary', (
+    tester,
+  ) async {
+    final repository = InMemoryAiSettingsRepository();
+
+    await _pumpMe(tester, repository);
+    await _scrollUntilVisible(tester, find.text('Account'));
+
+    expect(find.text('Signed out'), findsOneWidget);
+    expect(find.text('Mock local auth'), findsOneWidget);
+    expect(find.text('Use mock account'), findsOneWidget);
+    expect(find.textContaining('Nutrition logs remain local'), findsOneWidget);
+  });
+
+  testWidgets('user can sign in and out of mock local auth', (tester) async {
+    final aiRepository = InMemoryAiSettingsRepository();
+    final authRepository = InMemoryAuthRepository();
+
+    await _pumpMe(tester, aiRepository, authRepository: authRepository);
+    await _scrollUntilVisible(tester, find.text('Use mock account'));
+    await tester.tap(find.text('Use mock account'));
+    await tester.pumpAndSettle();
+
+    expect(
+      (await authRepository.loadState()).status,
+      AuthConnectionStatus.signedIn,
+    );
+    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text('Local mock user'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(
+      (await authRepository.loadState()).status,
+      AuthConnectionStatus.signedOut,
+    );
+    expect(find.text('Signed out'), findsOneWidget);
+  });
+
+  testWidgets('provider-unavailable auth state is visible without secrets', (
+    tester,
+  ) async {
+    final aiRepository = InMemoryAiSettingsRepository();
+    const unavailableState = AuthAccountState(
+      status: AuthConnectionStatus.providerUnavailable,
+      provider: AuthProvider.firebase,
+      statusDetail: 'Firebase Auth is not configured for this build.',
+    );
+
+    await _pumpMe(tester, aiRepository, authState: unavailableState);
+    await _scrollUntilVisible(tester, find.text('Provider unavailable'));
+
+    expect(find.text('Firebase Auth'), findsOneWidget);
+    expect(find.textContaining('not configured'), findsWidgets);
+    expect(find.text('Use mock account'), findsOneWidget);
   });
 
   testWidgets('user can select provider and model', (tester) async {
