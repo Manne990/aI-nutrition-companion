@@ -60,6 +60,35 @@ void main() {
   });
 
   group('SharedPreferencesHealthRepository', () {
+    test('persists connected and disconnected state across reloads', () async {
+      SharedPreferences.setMockInitialValues({});
+      final preferences = await SharedPreferences.getInstance();
+      final repository = SharedPreferencesHealthRepository(
+        preferences,
+        provider: const MockHealthDataProvider(),
+      );
+
+      final connected = await repository.requestConnection();
+      final reloadedConnected = await SharedPreferencesHealthRepository(
+        preferences,
+        provider: const MockHealthDataProvider(signals: null),
+      ).loadState();
+
+      expect(connected.statusLabel, 'Connected');
+      expect(reloadedConnected.status, HealthConnectionStatus.connected);
+      expect(reloadedConnected.statusLabel, 'Connected');
+
+      await repository.disconnect();
+      final reloadedDisconnected = await SharedPreferencesHealthRepository(
+        preferences,
+        provider: const MockHealthDataProvider(),
+      ).loadState();
+
+      expect(reloadedDisconnected.status, HealthConnectionStatus.disconnected);
+      expect(reloadedDisconnected.statusLabel, 'Not connected');
+      expect(reloadedDisconnected.signals, isNull);
+    });
+
     test('ignores corrupt persisted health signals', () async {
       SharedPreferences.setMockInitialValues({
         SharedPreferencesHealthRepository.statusKey: 'connected',

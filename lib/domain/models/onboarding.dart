@@ -10,6 +10,7 @@ class OnboardingProfile {
     required this.acceptedPrivacyBoundary,
     required this.completedAt,
     this.backupPreference = LocalDataBackupPreference.localOnly,
+    this.healthConnectionApproved = false,
     this.targetWeightKg,
     this.dietaryPreferences = const [],
     this.allergies = const [],
@@ -28,6 +29,7 @@ class OnboardingProfile {
   final bool acceptedPrivacyBoundary;
   final DateTime completedAt;
   final LocalDataBackupPreference backupPreference;
+  final bool healthConnectionApproved;
 
   bool get hasRequiredConsent {
     return acceptedNutritionDisclaimer &&
@@ -63,6 +65,7 @@ class OnboardingProfile {
       'acceptedPrivacyBoundary': acceptedPrivacyBoundary,
       'completedAt': completedAt.toIso8601String(),
       'backupPreference': backupPreference.name,
+      'healthConnectionApproved': healthConnectionApproved,
     };
   }
 
@@ -86,6 +89,7 @@ class OnboardingProfile {
           DateTime.tryParse(_string(json['completedAt'], fallback: '')) ??
           DateTime.fromMillisecondsSinceEpoch(0),
       backupPreference: _backupPreference(json['backupPreference']),
+      healthConnectionApproved: json['healthConnectionApproved'] == true,
     );
   }
 }

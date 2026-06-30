@@ -1,5 +1,6 @@
 import 'package:ai_nutrition_companion/app/ai_nutrition_companion_app.dart';
 import 'package:ai_nutrition_companion/app/service_credentials.dart';
+import 'package:ai_nutrition_companion/domain/models/health.dart';
 import 'package:ai_nutrition_companion/domain/models/nutrition.dart';
 import 'package:ai_nutrition_companion/domain/models/onboarding.dart';
 import 'package:ai_nutrition_companion/domain/repositories/ai_chat_repository.dart';
@@ -73,6 +74,7 @@ Future<void> _pumpApp(
   WidgetTester tester, {
   InMemoryOnboardingRepository? repository,
   AiSettingsRepository? aiSettingsRepository,
+  HealthRepository? healthRepository,
   NutritionRepository? nutritionRepository,
   FoodDataCentralSearchClient? foodDataCentralSearchClient,
   AppServiceCredentials serviceCredentials = const AppServiceCredentials(),
@@ -86,7 +88,7 @@ Future<void> _pumpApp(
       aiSettingsRepository:
           aiSettingsRepository ?? InMemoryAiSettingsRepository(),
       authRepository: InMemoryAuthRepository(),
-      healthRepository: InMemoryHealthRepository(),
+      healthRepository: healthRepository ?? InMemoryHealthRepository(),
       aiChatRepository: InMemoryAiChatRepository(),
       nutritionRepository: useDefaultNutritionRepository
           ? nutritionRepository
@@ -280,8 +282,13 @@ void main() {
     tester,
   ) async {
     final repository = InMemoryOnboardingRepository();
+    final healthRepository = InMemoryHealthRepository();
 
-    await _pumpApp(tester, repository: repository);
+    await _pumpApp(
+      tester,
+      repository: repository,
+      healthRepository: healthRepository,
+    );
 
     expect(find.text('Set your direction'), findsOneWidget);
 
@@ -298,6 +305,17 @@ void main() {
     expect(find.text('Consent boundaries'), findsOneWidget);
     expect(find.text('Start Today'), findsOneWidget);
     await tester.tap(find.text('Allow backup'));
+    await tester.pumpAndSettle();
+    await _scrollUntilVisible(
+      tester,
+      find.text('Connect Health for nutrition context.'),
+    );
+    await tester.tap(
+      find.widgetWithText(
+        CheckboxListTile,
+        'Connect Health for nutrition context.',
+      ),
+    );
     await tester.pumpAndSettle();
 
     await _scrollUntilVisible(
@@ -344,6 +362,16 @@ void main() {
       profile?.backupPreference,
       LocalDataBackupPreference.platformBackupAllowed,
     );
+    expect(profile?.healthConnectionApproved, isTrue);
+    expect(
+      (await healthRepository.loadState()).status,
+      HealthConnectionStatus.connected,
+    );
+
+    await tester.tap(find.byIcon(Icons.person_outline));
+    await tester.pumpAndSettle();
+    await _scrollUntilVisible(tester, find.text('Health connection'));
+    expect(find.text('Connected'), findsOneWidget);
   });
 
   testWidgets(

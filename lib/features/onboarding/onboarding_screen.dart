@@ -30,6 +30,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   bool _acceptedPrivacy = false;
   LocalDataBackupPreference _backupPreference =
       LocalDataBackupPreference.localOnly;
+  bool _healthConnectionApproved = false;
   final Set<String> _dietaryPreferences = {'high protein'};
 
   bool get _canFinish => _acceptedNutrition && _acceptedAi && _acceptedPrivacy;
@@ -96,11 +97,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   _ConsentStep(
                     backupPreference: _backupPreference,
+                    healthConnectionApproved: _healthConnectionApproved,
                     acceptedNutrition: _acceptedNutrition,
                     acceptedAi: _acceptedAi,
                     acceptedPrivacy: _acceptedPrivacy,
                     onBackupPreferenceChanged: (preference) {
                       setState(() => _backupPreference = preference);
+                    },
+                    onHealthConnectionChanged: (value) {
+                      setState(() => _healthConnectionApproved = value);
                     },
                     onNutritionChanged: (value) {
                       setState(() => _acceptedNutrition = value);
@@ -191,6 +196,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         acceptedPrivacyBoundary: _acceptedPrivacy,
         completedAt: DateTime.now(),
         backupPreference: _backupPreference,
+        healthConnectionApproved: _healthConnectionApproved,
       ),
     );
   }
@@ -350,20 +356,24 @@ class _TargetStep extends StatelessWidget {
 class _ConsentStep extends StatelessWidget {
   const _ConsentStep({
     required this.backupPreference,
+    required this.healthConnectionApproved,
     required this.acceptedNutrition,
     required this.acceptedAi,
     required this.acceptedPrivacy,
     required this.onBackupPreferenceChanged,
+    required this.onHealthConnectionChanged,
     required this.onNutritionChanged,
     required this.onAiChanged,
     required this.onPrivacyChanged,
   });
 
   final LocalDataBackupPreference backupPreference;
+  final bool healthConnectionApproved;
   final bool acceptedNutrition;
   final bool acceptedAi;
   final bool acceptedPrivacy;
   final ValueChanged<LocalDataBackupPreference> onBackupPreferenceChanged;
+  final ValueChanged<bool> onHealthConnectionChanged;
   final ValueChanged<bool> onNutritionChanged;
   final ValueChanged<bool> onAiChanged;
   final ValueChanged<bool> onPrivacyChanged;
@@ -407,6 +417,17 @@ class _ConsentStep extends StatelessWidget {
               Text(backupPreference.description),
             ],
           ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        CheckboxListTile(
+          value: healthConnectionApproved,
+          onChanged: (value) => onHealthConnectionChanged(value ?? false),
+          title: const Text('Connect Health for nutrition context.'),
+          subtitle: const Text(
+            'Health is optional and is never used for diagnosis or treatment.',
+          ),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
         ),
         const SizedBox(height: AppSpacing.md),
         _ConsentCheckbox(

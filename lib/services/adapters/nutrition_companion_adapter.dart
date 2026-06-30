@@ -76,10 +76,10 @@ String _healthContext(HealthSignalSnapshot? signals) {
     return '';
   }
   if (signals.sleepHours != null && signals.sleepHours! < 7) {
-    return ' Mock health signals show shorter sleep, so the suggestion stays easy to prep.';
+    return ' Health context shows shorter sleep, so the suggestion stays easy to prep.';
   }
   if (signals.activeMinutes != null && signals.activeMinutes! >= 40) {
-    return ' Mock health signals show an active day, so recovery protein is prioritized.';
+    return ' Health context shows an active day, so recovery protein is prioritized.';
   }
-  return ' Mock health signals are available for personalization.';
+  return ' Health context is available for personalization.';
 }
