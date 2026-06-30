@@ -4,6 +4,161 @@ import 'dart:io';
 import '../../domain/models/nutrition.dart';
 import '../../domain/services/nutrition_lookup_service.dart';
 
+abstract interface class FoodDataCentralSearchClient {
+  Future<FoodDataCentralSearchResponse> searchFoods({
+    required String query,
+    required String apiKey,
+  });
+}
+
+class FoodDataCentralSearchResponse {
+  const FoodDataCentralSearchResponse({required this.foods});
+
+  factory FoodDataCentralSearchResponse.fromJson(Map<String, Object?> json) {
+    final rawFoods = json['foods'];
+    if (rawFoods is! List) {
+      return const FoodDataCentralSearchResponse(foods: []);
+    }
+
+    return FoodDataCentralSearchResponse(
+      foods: List.unmodifiable(
+        rawFoods
+            .map(_asObjectMap)
+            .nonNulls
+            .map(FoodDataCentralSearchFood.fromJson)
+            .nonNulls,
+      ),
+    );
+  }
+
+  final List<FoodDataCentralSearchFood> foods;
+
+  FoodItem? firstUsableFood() {
+    for (final food in foods) {
+      final item = food.toFoodItem();
+      if (item != null) {
+        return item;
+      }
+    }
+    return null;
+  }
+}
+
+class FoodDataCentralSearchFood {
+  const FoodDataCentralSearchFood({
+    required this.description,
+    required this.nutrients,
+    this.fdcId,
+    this.servingDescription,
+  });
+
+  static FoodDataCentralSearchFood? fromJson(Map<String, Object?> json) {
+    final description = _asString(json['description'])?.trim();
+    if (description == null || description.isEmpty) {
+      return null;
+    }
+
+    return FoodDataCentralSearchFood(
+      fdcId: _asString(json['fdcId']) ?? _asString(json['foodCode']),
+      description: description,
+      servingDescription: _servingDescription(json),
+      nutrients: FoodDataCentralNutrients.fromJson(json['foodNutrients']),
+    );
+  }
+
+  final String? fdcId;
+  final String description;
+  final String? servingDescription;
+  final FoodDataCentralNutrients nutrients;
+
+  FoodItem? toFoodItem() {
+    final calories = nutrients.calories;
+    final protein = nutrients.proteinGrams;
+    final carbs = nutrients.carbsGrams;
+    final fat = nutrients.fatGrams;
+    if (calories == null || protein == null || carbs == null || fat == null) {
+      return null;
+    }
+
+    final idSuffix =
+        fdcId ?? normalizeFoodName(description).replaceAll(' ', '-');
+    return FoodItem(
+      id: 'fdc-$idSuffix',
+      name: description,
+      servingDescription: servingDescription ?? '100 g reference',
+      nutritionPerServing: MacroTotals(
+        calories: calories,
+        proteinGrams: protein,
+        carbsGrams: carbs,
+        fatGrams: fat,
+      ),
+      source: const SourceMetadata(
+        source: NutritionSource.databaseVerified,
+        label: 'FoodData Central',
+        provider: 'fooddata-central',
+      ),
+    );
+  }
+}
+
+class FoodDataCentralNutrients {
+  const FoodDataCentralNutrients({
+    this.calories,
+    this.proteinGrams,
+    this.carbsGrams,
+    this.fatGrams,
+  });
+
+  factory FoodDataCentralNutrients.fromJson(Object? rawNutrients) {
+    if (rawNutrients is! List) {
+      return const FoodDataCentralNutrients();
+    }
+
+    double? calories;
+    double? protein;
+    double? carbs;
+    double? fat;
+
+    for (final rawNutrient in rawNutrients) {
+      final nutrient = _asObjectMap(rawNutrient);
+      if (nutrient == null) {
+        continue;
+      }
+
+      final id = _asInt(nutrient['nutrientId']);
+      final name = _asString(nutrient['nutrientName'])?.toLowerCase() ?? '';
+      final value = _asDouble(nutrient['value'] ?? nutrient['nutrientNumber']);
+      if (value == null) {
+        continue;
+      }
+
+      if (id == 1008 || name.contains('energy')) {
+        calories ??= value;
+      } else if (id == 1003 || name.contains('protein')) {
+        protein ??= value;
+      } else if (id == 1005 || name.contains('carbohydrate')) {
+        carbs ??= value;
+      } else if (id == 1004 ||
+          name.contains('total lipid') ||
+          name.contains('total fat')) {
+        fat ??= value;
+      }
+    }
+
+    return FoodDataCentralNutrients(
+      calories: calories,
+      proteinGrams: protein,
+      carbsGrams: carbs,
+      fatGrams: fat,
+    );
+  }
+
+  final double? calories;
+  final double? proteinGrams;
+  final double? carbsGrams;
+  final double? fatGrams;
+}
+
 class LocalNutritionLookupProvider implements NutritionLookupProvider {
   LocalNutritionLookupProvider({required Iterable<FoodItem> foods})
     : _foods = List.unmodifiable(foods);
@@ -335,11 +490,13 @@ double? _firstNumber(Map<String, Object?> json, Iterable<String> keys) {
 class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
   const FoodDataCentralNutritionProvider({
     required this.apiKey,
+    this.client,
     this.foodsByName = const {},
     this.simulateFailure = false,
   });
 
   final String? apiKey;
+  final FoodDataCentralSearchClient? client;
   final Map<String, FoodItem> foodsByName;
   final bool simulateFailure;
 
@@ -348,12 +505,15 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
 
   @override
   Future<NutritionLookupResult> lookup(NutritionLookupQuery query) async {
-    if (apiKey == null || apiKey!.trim().isEmpty) {
+    final configuredApiKey = apiKey?.trim() ?? '';
+    if (configuredApiKey.isEmpty) {
       return NutritionLookupResult(
         query: query,
         status: NutritionLookupStatus.missingApiKey,
         providerName: providerName,
-        message: 'FOODDATA_CENTRAL_API_KEY is not configured.',
+        message:
+            'Add a FoodData Central API key to use generic food search. '
+            'No app-owned key is bundled.',
       );
     }
 
@@ -364,6 +524,51 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
         providerName: providerName,
         message: 'FoodData Central lookup failed in the adapter boundary.',
       );
+    }
+
+    final searchClient = client;
+    if (searchClient != null) {
+      try {
+        final response = await searchClient.searchFoods(
+          query: query.foodName,
+          apiKey: configuredApiKey,
+        );
+        if (response.foods.isEmpty) {
+          return NutritionLookupResult(
+            query: query,
+            status: NutritionLookupStatus.notFound,
+            providerName: providerName,
+            message: 'No FoodData Central result matched "${query.foodName}".',
+          );
+        }
+
+        final food = response.firstUsableFood();
+        if (food == null) {
+          return NutritionLookupResult(
+            query: query,
+            status: NutritionLookupStatus.providerError,
+            providerName: providerName,
+            message:
+                'FoodData Central response did not include calories, protein, '
+                'carbs, and fat.',
+          );
+        }
+
+        return NutritionLookupResult(
+          query: query,
+          status: NutritionLookupStatus.verified,
+          providerName: providerName,
+          food: food,
+          message: 'Matched FoodData Central search nutrition.',
+        );
+      } catch (_) {
+        return NutritionLookupResult(
+          query: query,
+          status: NutritionLookupStatus.providerError,
+          providerName: providerName,
+          message: 'FoodData Central lookup failed in the adapter boundary.',
+        );
+      }
     }
 
     final food = foodsByName[query.normalizedFoodName];
@@ -384,4 +589,53 @@ class FoodDataCentralNutritionProvider implements NutritionLookupProvider {
       message: 'Matched configured FoodData Central nutrition.',
     );
   }
+}
+
+Map<String, Object?>? _asObjectMap(Object? value) {
+  if (value is! Map) {
+    return null;
+  }
+  return value.map((key, value) => MapEntry(key.toString(), value));
+}
+
+String? _asString(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return value.toString();
+}
+
+double? _asDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value);
+  }
+  return null;
+}
+
+int? _asInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+String? _servingDescription(Map<String, Object?> json) {
+  final servingSize = _asDouble(json['servingSize']);
+  final servingUnit = _asString(json['servingSizeUnit']);
+  if (servingSize == null || servingUnit == null || servingUnit.isEmpty) {
+    return null;
+  }
+  final formattedSize = servingSize == servingSize.roundToDouble()
+      ? servingSize.toStringAsFixed(0)
+      : servingSize.toString();
+  return '$formattedSize $servingUnit serving';
 }

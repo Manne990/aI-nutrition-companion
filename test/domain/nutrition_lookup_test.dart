@@ -160,9 +160,95 @@ void main() {
 
         expect(result.status, NutritionLookupStatus.missingApiKey);
         expect(result.isProviderUnavailable, isTrue);
-        expect(result.message, contains('FOODDATA_CENTRAL_API_KEY'));
+        expect(result.message, contains('FoodData Central API key'));
+        expect(result.message, contains('No app-owned key'));
       },
     );
+
+    test('FoodData Central adapter parses search fixtures', () async {
+      final client = _FakeFoodDataCentralSearchClient(
+        response: FoodDataCentralSearchResponse.fromJson({
+          'foods': [
+            {
+              'fdcId': 175167,
+              'description': 'Salmon, raw',
+              'servingSize': 100,
+              'servingSizeUnit': 'g',
+              'foodNutrients': [
+                {'nutrientId': 1008, 'nutrientName': 'Energy', 'value': 208},
+                {'nutrientId': 1003, 'nutrientName': 'Protein', 'value': 20.4},
+                {
+                  'nutrientId': 1005,
+                  'nutrientName': 'Carbohydrate, by difference',
+                  'value': 0,
+                },
+                {
+                  'nutrientId': 1004,
+                  'nutrientName': 'Total lipid (fat)',
+                  'value': 13.4,
+                },
+              ],
+            },
+          ],
+        }),
+      );
+      final provider = FoodDataCentralNutritionProvider(
+        apiKey: 'user-owned-test-key',
+        client: client,
+      );
+
+      final result = await provider.lookup(
+        const NutritionLookupQuery(foodName: 'salmon'),
+      );
+
+      expect(client.lastApiKey, 'user-owned-test-key');
+      expect(client.lastQuery, 'salmon');
+      expect(result.status, NutritionLookupStatus.verified);
+      expect(result.providerName, 'fooddata-central');
+      expect(result.food?.id, 'fdc-175167');
+      expect(result.food?.name, 'Salmon, raw');
+      expect(result.food?.servingDescription, '100 g serving');
+      expect(result.food?.source.provider, 'fooddata-central');
+      expect(result.food?.nutritionPerServing?.calories, 208);
+      expect(result.food?.nutritionPerServing?.proteinGrams, 20.4);
+      expect(result.food?.nutritionPerServing?.carbsGrams, 0);
+      expect(result.food?.nutritionPerServing?.fatGrams, 13.4);
+    });
+
+    test('FoodData Central adapter reports no search results', () async {
+      final provider = FoodDataCentralNutritionProvider(
+        apiKey: 'user-owned-test-key',
+        client: _FakeFoodDataCentralSearchClient(
+          response: const FoodDataCentralSearchResponse(foods: []),
+        ),
+      );
+
+      final result = await provider.lookup(
+        const NutritionLookupQuery(foodName: 'unknown food'),
+      );
+
+      expect(result.status, NutritionLookupStatus.notFound);
+      expect(result.providerName, 'fooddata-central');
+      expect(result.message, contains('No FoodData Central result'));
+    });
+
+    test('FoodData Central adapter reports provider errors', () async {
+      final provider = FoodDataCentralNutritionProvider(
+        apiKey: 'user-owned-test-key',
+        client: _FakeFoodDataCentralSearchClient(
+          failure: StateError('simulated transport failure'),
+        ),
+      );
+
+      final result = await provider.lookup(
+        const NutritionLookupQuery(foodName: 'salmon'),
+      );
+
+      expect(result.status, NutritionLookupStatus.providerError);
+      expect(result.providerName, 'fooddata-central');
+      expect(result.message, contains('FoodData Central lookup failed'));
+      expect(result.message, isNot(contains('user-owned-test-key')));
+    });
   });
 
   group('NutritionEnrichmentService', () {
@@ -252,7 +338,7 @@ void main() {
         );
         expect(
           enrichment.lookupResults.single.message,
-          contains('FOODDATA_CENTRAL_API_KEY'),
+          contains('FoodData Central API key'),
         );
         expect(enriched.source.source, NutritionSource.aiEstimated);
         expect(enriched.food.source.source, NutritionSource.fallback);
@@ -344,5 +430,29 @@ class _FakeOpenFoodFactsTransport implements OpenFoodFactsTransport {
 
     return response ??
         const OpenFoodFactsTransportResponse(statusCode: 404, body: '{}');
+  }
+}
+
+class _FakeFoodDataCentralSearchClient implements FoodDataCentralSearchClient {
+  _FakeFoodDataCentralSearchClient({this.response, this.failure});
+
+  final FoodDataCentralSearchResponse? response;
+  final Object? failure;
+
+  String? lastQuery;
+  String? lastApiKey;
+
+  @override
+  Future<FoodDataCentralSearchResponse> searchFoods({
+    required String query,
+    required String apiKey,
+  }) async {
+    lastQuery = query;
+    lastApiKey = apiKey;
+    final failure = this.failure;
+    if (failure != null) {
+      throw failure;
+    }
+    return response ?? const FoodDataCentralSearchResponse(foods: []);
   }
 }
