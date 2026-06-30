@@ -76,17 +76,35 @@ void main() {
     test('release documentation matches signing boundaries', () {
       final docs = readFile('docs/release-readiness.md');
       final gitignore = readFile('.gitignore');
+      final readme = readFile('README.md');
+      final releaseScript = readFile('scripts/release_verify.sh');
+      final releaseScriptTest = readFile('scripts/test_release_verify.sh');
+      final localCi = readFile('scripts/local_ci.sh');
 
       expect(docs, contains('app.ainutrition.companion'));
       expect(docs, contains('AI_NUTRITION_ANDROID_APPLICATION_ID'));
       expect(docs, contains('AI_NUTRITION_IOS_BUNDLE_ID'));
       expect(docs, contains('AI_NUTRITION_IOS_DEVELOPMENT_TEAM'));
       expect(docs, contains('android/key.properties'));
+      expect(docs, contains('bash scripts/release_verify.sh'));
+      expect(docs, contains('flutter build ios --release --no-codesign'));
+      expect(docs, contains('flutter build appbundle --release'));
       expect(docs, contains('The release build must not'));
       expect(docs, contains('use debug signing.'));
       expect(gitignore, contains('/android/key.properties'));
       expect(gitignore, contains('/android/*.jks'));
       expect(gitignore, contains('/android/*.keystore'));
+      expect(readme, contains('bash scripts/release_verify.sh'));
+      expect(releaseScript, contains('flutter build appbundle --release'));
+      expect(
+        releaseScript,
+        contains('flutter build ios --release --no-codesign'),
+      );
+      expect(releaseScript, contains('Android signing credentials: MISSING'));
+      expect(releaseScript, contains('CocoaPods is missing'));
+      expect(releaseScript, contains('Xcode command-line tools are missing'));
+      expect(releaseScriptTest, contains('--skip-toolchain'));
+      expect(localCi, contains('bash scripts/test_release_verify.sh'));
     });
   });
 }
