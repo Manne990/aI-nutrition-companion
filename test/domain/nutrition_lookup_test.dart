@@ -35,28 +35,91 @@ void main() {
       expect(result.message, contains('fallback'));
     });
 
+    test('Open Food Facts adapter parses barcode product response', () async {
+      final transport = _FakeOpenFoodFactsTransport(
+        response: const OpenFoodFactsTransportResponse(
+          statusCode: 200,
+          body: '''
+{
+  "status": 1,
+  "product": {
+    "product_name": "Packaged skyr",
+    "serving_size": "170 g cup",
+    "nutriments": {
+      "energy-kcal_serving": 120,
+      "proteins_serving": "18",
+      "carbohydrates_serving": 8,
+      "fat_serving": 0.2
+    }
+  }
+}
+''',
+        ),
+      );
+      final provider = OpenFoodFactsNutritionProvider(transport: transport);
+
+      final result = await provider.lookup(
+        const NutritionLookupQuery(foodName: 'skyr', barcode: '1234567890123'),
+      );
+
+      expect(result.status, NutritionLookupStatus.verified);
+      expect(result.food?.id, 'off-1234567890123');
+      expect(result.food?.name, 'Packaged skyr');
+      expect(result.food?.servingDescription, '170 g cup');
+      expect(result.food?.nutritionPerServing?.calories, 120);
+      expect(result.food?.nutritionPerServing?.proteinGrams, 18);
+      expect(result.food?.nutritionPerServing?.carbsGrams, 8);
+      expect(result.food?.nutritionPerServing?.fatGrams, 0.2);
+      expect(result.food?.source.source, NutritionSource.databaseVerified);
+      expect(result.food?.source.provider, 'open-food-facts');
+      expect(result.providerName, 'open-food-facts');
+      expect(transport.lastUri?.path, '/api/v3/product/1234567890123.json');
+      expect(
+        transport.lastHeaders['user-agent'],
+        contains('AI Nutrition Companion'),
+      );
+      expect(transport.lastHeaders['accept'], 'application/json');
+    });
+
+    test('Open Food Facts adapter reports barcode not found', () async {
+      final provider = OpenFoodFactsNutritionProvider(
+        transport: _FakeOpenFoodFactsTransport(
+          response: const OpenFoodFactsTransportResponse(
+            statusCode: 200,
+            body: '{"status":0,"status_verbose":"product not found"}',
+          ),
+        ),
+      );
+
+      final result = await provider.lookup(
+        const NutritionLookupQuery(foodName: 'unknown', barcode: '0000000000'),
+      );
+
+      expect(result.status, NutritionLookupStatus.notFound);
+      expect(result.food, isNull);
+      expect(result.message, contains('No Open Food Facts product matched'));
+    });
+
     test(
-      'Open Food Facts adapter is barcode-ready and deterministic',
+      'Open Food Facts adapter reports malformed product response',
       () async {
-        const packagedSkyr = FoodItem(
-          id: 'off-skyr',
-          name: 'Packaged skyr',
-          servingDescription: '170 g cup',
-          nutritionPerServing: MacroTotals(
-            calories: 120,
-            proteinGrams: 18,
-            carbsGrams: 8,
-            fatGrams: 0.2,
+        final provider = OpenFoodFactsNutritionProvider(
+          transport: _FakeOpenFoodFactsTransport(
+            response: const OpenFoodFactsTransportResponse(
+              statusCode: 200,
+              body: '''
+{
+  "status": 1,
+  "product": {
+    "product_name": "Nameless macros",
+    "nutriments": {
+      "energy-kcal_serving": 80
+    }
+  }
+}
+''',
+            ),
           ),
-          source: SourceMetadata(
-            source: NutritionSource.databaseVerified,
-            label: 'Open Food Facts',
-            provider: 'open-food-facts',
-            confidence: 0.98,
-          ),
-        );
-        const provider = OpenFoodFactsNutritionProvider(
-          packagedProducts: {'1234567890123': packagedSkyr},
         );
 
         final result = await provider.lookup(
@@ -66,11 +129,25 @@ void main() {
           ),
         );
 
-        expect(result.status, NutritionLookupStatus.verified);
-        expect(result.food?.id, 'off-skyr');
-        expect(result.food?.source.provider, 'open-food-facts');
+        expect(result.status, NutritionLookupStatus.providerError);
+        expect(result.food, isNull);
+        expect(result.message, contains('malformed nutrition data'));
       },
     );
+
+    test('Open Food Facts adapter reports transport errors', () async {
+      final provider = OpenFoodFactsNutritionProvider(
+        transport: _FakeOpenFoodFactsTransport(throwsError: true),
+      );
+
+      final result = await provider.lookup(
+        const NutritionLookupQuery(foodName: 'skyr', barcode: '1234567890123'),
+      );
+
+      expect(result.status, NutritionLookupStatus.providerError);
+      expect(result.isProviderUnavailable, isTrue);
+      expect(result.message, contains('lookup failed'));
+    });
 
     test(
       'FoodData Central adapter reports missing API key explicitly',
@@ -242,4 +319,30 @@ void main() {
       expect(confirmed.source.source, NutritionSource.userConfirmed);
     });
   });
+}
+
+class _FakeOpenFoodFactsTransport implements OpenFoodFactsTransport {
+  _FakeOpenFoodFactsTransport({this.response, this.throwsError = false});
+
+  final OpenFoodFactsTransportResponse? response;
+  final bool throwsError;
+
+  Uri? lastUri;
+  Map<String, String> lastHeaders = const {};
+
+  @override
+  Future<OpenFoodFactsTransportResponse> get(
+    Uri uri,
+    Map<String, String> headers,
+  ) async {
+    lastUri = uri;
+    lastHeaders = Map.unmodifiable(headers);
+
+    if (throwsError) {
+      throw const FormatException('network unavailable');
+    }
+
+    return response ??
+        const OpenFoodFactsTransportResponse(statusCode: 404, body: '{}');
+  }
 }
