@@ -68,6 +68,13 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
             'Take or choose a meal photo, review the estimate, correct it, then save confirmed values.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Photo access starts only after you choose camera or gallery. Estimates are guidance until you confirm them.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.mutedInk),
+          ),
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
