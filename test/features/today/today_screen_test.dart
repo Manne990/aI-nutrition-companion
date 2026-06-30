@@ -47,6 +47,7 @@ class _FixtureAdapter implements NutritionCompanionAdapter {
 }
 
 void main() {
+  final testNow = DateTime(2026, 6, 29, 15, 30);
   final profile = OnboardingProfile(
     primaryGoal: 'Build steady high-protein habits',
     proteinGoalGrams: 110,
@@ -90,6 +91,7 @@ void main() {
         TodayScreen(
           profile: profile,
           adapter: _FixtureAdapter([firstSuggestion, secondSuggestion]),
+          now: testNow,
         ),
       ),
     );
@@ -129,6 +131,57 @@ void main() {
     expect(find.textContaining('You are about 45g short'), findsOneWidget);
   });
 
+  testWidgets('production default uses current day without fixture clock', (
+    tester,
+  ) async {
+    final runtimeNow = DateTime.now();
+    final repository = InMemoryNutritionRepository(
+      seedMeals: [
+        Meal(
+          id: 'runtime-meal',
+          name: 'Runtime breakfast',
+          eatenAt: runtimeNow,
+          source: NutritionSeedData.userSource,
+          items: const [
+            MealItem(
+              id: 'runtime-oats',
+              food: FoodItem(
+                id: 'runtime-oats-food',
+                name: 'Runtime oats',
+                servingDescription: '1 bowl',
+                nutritionPerServing: MacroTotals(
+                  calories: 350,
+                  proteinGrams: 24,
+                  carbsGrams: 45,
+                  fatGrams: 8,
+                ),
+                source: NutritionSeedData.userSource,
+              ),
+              servings: 1,
+              source: NutritionSeedData.userSource,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        TodayScreen(
+          profile: profile,
+          adapter: const _FixtureAdapter([]),
+          repository: repository,
+        ),
+      ),
+    );
+
+    expect(find.text('Monday, June 29'), findsNothing);
+    await _scrollUntilVisible(tester, find.text('Runtime breakfast'));
+
+    expect(find.text('Runtime breakfast'), findsOneWidget);
+    expect(find.text('Meal history is empty for today.'), findsNothing);
+  });
+
   testWidgets('suggestion rationale changes when no meals are confirmed', (
     tester,
   ) async {
@@ -138,6 +191,7 @@ void main() {
           profile: profile,
           adapter: _FixtureAdapter([firstSuggestion]),
           repository: InMemoryNutritionRepository(seedMeals: const []),
+          now: testNow,
         ),
       ),
     );
@@ -335,6 +389,7 @@ void main() {
         TodayScreen(
           profile: profile,
           adapter: _FixtureAdapter([firstSuggestion, secondSuggestion]),
+          now: testNow,
         ),
       ),
     );
@@ -385,6 +440,7 @@ void main() {
           profile: profile,
           adapter: _FixtureAdapter([firstSuggestion]),
           chatRepository: chatRepository,
+          now: testNow,
         ),
       ),
     );
@@ -421,6 +477,7 @@ void main() {
           profile: profile,
           adapter: const _FixtureAdapter([]),
           repository: InMemoryNutritionRepository(seedMeals: const []),
+          now: testNow,
         ),
       ),
     );
@@ -547,6 +604,7 @@ void main() {
           profile: profile,
           adapter: _FixtureAdapter([firstSuggestion]),
           repository: repository,
+          now: testNow,
         ),
       ),
     );
@@ -587,6 +645,7 @@ void main() {
           TodayScreen(
             profile: profile,
             adapter: _FixtureAdapter([firstSuggestion, secondSuggestion]),
+            now: testNow,
           ),
         ),
       );

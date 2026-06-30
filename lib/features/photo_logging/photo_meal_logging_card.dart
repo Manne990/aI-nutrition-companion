@@ -168,6 +168,8 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
     return _drafts.where((draft) => !draft.isRemoved);
   }
 
+  DateTime _now() => widget.now ?? DateTime.now();
+
   MacroTotals get _totals {
     return _activeDrafts.fold(
       const MacroTotals.zero(),
@@ -310,7 +312,7 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
       return;
     }
 
-    final savedAt = widget.now ?? DateTime(2026, 6, 29, 17, 55);
+    final savedAt = _now();
     final meal = Meal(
       id: 'packaged-meal-${savedAt.millisecondsSinceEpoch}',
       name: food.name,
@@ -348,7 +350,7 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
       return;
     }
 
-    final savedAt = widget.now ?? DateTime(2026, 6, 29, 17, 56);
+    final savedAt = _now();
     final meal = Meal(
       id: 'generic-meal-${savedAt.millisecondsSinceEpoch}',
       name: food.name,
@@ -424,7 +426,7 @@ class _PhotoMealLoggingCardState extends State<PhotoMealLoggingCard> {
       return;
     }
 
-    final savedAt = widget.now ?? DateTime(2026, 6, 29, 17, 50);
+    final savedAt = _now();
     final correctedItems = _activeDrafts.map((draft) {
       final food = FoodItem(
         id: 'confirmed-food-${draft.id}',

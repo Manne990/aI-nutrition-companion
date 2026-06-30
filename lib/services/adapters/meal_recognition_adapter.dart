@@ -19,10 +19,12 @@ class MockMealRecognitionAdapter implements MealRecognitionAdapter {
   const MockMealRecognitionAdapter({
     this.shouldFail = false,
     this.configuration,
+    this.capturedAt,
   });
 
   final bool shouldFail;
   final AiAdapterConfiguration? configuration;
+  final DateTime? capturedAt;
 
   @override
   Future<MealEstimate> estimateMealFromPhoto(PhotoMealCapture capture) async {
@@ -32,7 +34,7 @@ class MockMealRecognitionAdapter implements MealRecognitionAdapter {
       );
     }
 
-    final capturedAt = DateTime(2026, 6, 29, 17, 45);
+    final capturedAt = this.capturedAt ?? DateTime.now();
     final provider = configuration == null
         ? 'mock-photo-ai'
         : '${configuration!.providerLabel} ${configuration!.settings.model}';
